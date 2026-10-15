@@ -65,6 +65,15 @@ enum tinyfota_err {
 #define TINYFOTA_RSP_MAX 9u
 
 /**
+ * How long a stalled transfer holds the receiver before another peer's BEGIN
+ * may take it over. Kconfig sets it on Zephyr, where zephyr/Kconfig says what
+ * it bounds; every other port and the host suites get the same default.
+ */
+#ifndef CONFIG_TINYFOTA_CLAIM_IDLE_MS
+#define CONFIG_TINYFOTA_CLAIM_IDLE_MS 10000
+#endif
+
+/**
  * A receiver owner. Each transport gets a distinct value so a disconnect or
  * malformed request on one endpoint cannot discard another endpoint's upload.
  */

@@ -471,6 +471,94 @@ static void test_receiver_ownership_and_retry(void)
 	     is_err(rsp, send_data(patch, sizeof(patch), rsp), TINYFOTA_ERR_SEQUENCE));
 }
 
+/* ---- receiver: a stalled claim is taken over ------------------------------- */
+
+/** BEGIN from the GATT owner with its own transfer id; true when it is OK. */
+static int gatt_begin(uint32_t total, uint8_t *rsp)
+{
+	uint8_t req[9] = {TINYFOTA_OP_BEGIN};
+	size_t rsp_len;
+
+	tinyfota_put_le32(0x55667788u, &req[1]);
+	tinyfota_put_le32(total, &req[5]);
+	rsp_len = frame_as(TINYFOTA_OWNER_GATT, req, sizeof(req), rsp);
+	return rsp_len == 9u && rsp[0] == TINYFOTA_RSP_OK &&
+	       tinyfota_get_le32(&rsp[1]) == 0x55667788u;
+}
+
+static void test_receiver_claim_takeover(void)
+{
+	const int64_t idle = CONFIG_TINYFOTA_CLAIM_IDLE_MS;
+	uint8_t rsp[TINYFOTA_RSP_MAX];
+	uint8_t head[HEAD_LEN];
+	uint8_t patch[64];
+	uint8_t wire[HEAD_LEN + sizeof(patch)];
+	uint32_t total = HEAD_LEN + sizeof(patch);
+	uint32_t next = 0;
+
+	t_group("dfu receiver: stalled claims are taken over");
+	fill_pattern(patch, sizeof(patch), 0x52);
+	build_head(head, patch, sizeof(patch), 0, 0);
+	memcpy(wire, head, HEAD_LEN);
+	memcpy(wire + HEAD_LEN, patch, sizeof(patch));
+
+	/* Unauthenticated: a hard deadline from BEGIN, which trickling cannot move. */
+	receiver_ready();
+	tinyfota_window_open((uint32_t)(10 * idle));
+	T_OK("first peer claims", is_ok(rsp, send_begin(total, rsp), 0));
+	(void)tinyfota_osal_host_advance_ms(idle - 1);
+	T_OK("it trickles part of the preamble", is_ok(rsp, send_data(head, 10u, rsp), 10u));
+	T_OK("a second peer is refused before the deadline", !gatt_begin(total, rsp));
+	T_OK("and told the receiver is busy", is_err(rsp, 2u, TINYFOTA_ERR_BUSY));
+	(void)tinyfota_osal_host_advance_ms(1);
+	T_OK("at the deadline the second peer takes over", gatt_begin(total, rsp));
+	T_OK("the first peer has lost its claim",
+	     is_err(rsp, send_data(head + 10u, 10u, rsp), TINYFOTA_ERR_BUSY));
+	T_EQ("nothing was erased for either", (long)dfufake_staging.erase_calls, 0L);
+
+	/* Authenticated: only a stall releases it, and progress keeps it. */
+	receiver_ready();
+	tinyfota_window_open((uint32_t)(10 * idle));
+	T_OK("an owner claims", is_ok(rsp, send_begin(total, rsp), 0));
+	T_OK("and authenticates", is_ok(rsp, send_data(head, HEAD_LEN, rsp), HEAD_LEN));
+	(void)tinyfota_osal_host_advance_ms(idle - 1);
+	T_OK("progress just before the timeout",
+	     is_ok(rsp, send_data(patch, 8u, rsp), HEAD_LEN + 8u));
+	(void)tinyfota_osal_host_advance_ms(idle - 1);
+	T_OK("a moving transfer is not taken", !gatt_begin(total, rsp));
+	T_OK("an empty DATA frame is answered",
+	     is_ok(rsp, send_data(patch, 0u, rsp), HEAD_LEN + 8u));
+	(void)tinyfota_osal_host_advance_ms(1);
+	T_OK("but is not progress: a stalled transfer is taken", gatt_begin(total, rsp));
+
+	/* A staged update is never taken over: it is verified and waiting. */
+	receiver_ready();
+	tinyfota_window_open((uint32_t)(10 * idle));
+	T_EQ("SMP stages a whole update", tinyfota_rx_upload(0, total, wire, total, &next), 0);
+	T_OK("staged", tinyfota_rx_staged());
+	(void)tinyfota_osal_host_advance_ms(2 * idle);
+	T_OK("a later peer cannot take a staged update", !gatt_begin(total, rsp));
+
+	/* SMP takes over a stalled framed claim the same way. */
+	receiver_ready();
+	tinyfota_window_open((uint32_t)(10 * idle));
+	T_OK("framed peer claims", is_ok(rsp, send_begin(total, rsp), 0));
+	T_EQ("SMP is busy at first", tinyfota_rx_upload(0, total, wire, 16u, &next), -EBUSY);
+	T_OK("the framed peer sends part of its preamble",
+	     is_ok(rsp, send_data(head, 16u, rsp), 16u));
+	(void)tinyfota_osal_host_advance_ms(idle);
+	next = 99u;
+	T_EQ("a mid-stream SMP chunk is not taken into the stalled transfer",
+	     tinyfota_rx_upload(16u, total, wire + 16u, 16u, &next), 0);
+	T_EQ("it is told to start again at 0", (long)next, 0L);
+	T_OK("and the framed transfer did not move",
+	     is_ok(rsp, send_data(head + 16u, 0u, rsp), 16u));
+	(void)tinyfota_osal_host_advance_ms(idle);
+	T_EQ("SMP takes over the stalled claim",
+	     tinyfota_rx_upload(0, total, wire, 16u, &next), 0);
+	T_EQ("and continues from its own first chunk", (long)next, 16L);
+}
+
 /* ---- receiver: the happy path --------------------------------------------- */
 
 static void test_receiver_stage(void)
@@ -1371,6 +1459,7 @@ int main(void)
 	test_receiver_framing();
 	test_receiver_auth();
 	test_receiver_ownership_and_retry();
+	test_receiver_claim_takeover();
 	test_receiver_stage();
 	test_receiver_commit_hook();
 	test_receiver_integrity();

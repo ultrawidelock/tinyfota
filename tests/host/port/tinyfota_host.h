@@ -59,9 +59,8 @@ void tinyfota_flash_host_reset(void);
 
 /* ---- deferred work and time (osal_host.c) ---------------------------------
  *
- * The virtual clock starts at 0 and moves only when a suite advances it; it
- * is deliberately independent of tinyfota_uptime_ms (real time), so a suite
- * that needs both aligned drives both.
+ * The virtual clock starts at 0 and moves only when a suite advances it, and
+ * tinyfota_uptime_ms reads it, so timers and uptime never disagree.
  */
 
 /** @brief Disarm every timer, clock back to 0. */

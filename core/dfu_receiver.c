@@ -55,6 +55,8 @@ static struct {
 	uint32_t got;   /**< wire bytes consumed so far */
 	uint32_t patch_crc;
 	uint32_t wpos; /**< next staging offset for patch data */
+	int64_t begin_ms; /**< when the claim was taken */
+	int64_t last_ms;  /**< when the claim last moved the cursor */
 	uint8_t head[HEAD_LEN];
 	uint8_t wbuf[WBUF_SZ];
 	size_t wlen;
@@ -462,6 +464,30 @@ static size_t reply_err(uint8_t *rsp, enum tinyfota_err code)
 #define TINYFOTA_ERR_OK ((enum tinyfota_err)0)
 
 /**
+ * May another peer's BEGIN take the current claim over?
+ *
+ * Never once the update is staged: it is verified and waiting for a reboot.
+ * Before the signed preamble has verified, the claim gets
+ * CONFIG_TINYFOTA_CLAIM_IDLE_MS from its BEGIN, however many bytes it sends:
+ * the preamble takes milliseconds, and a deadline that progress could extend
+ * would let a peer with no signed header trickle bytes for the whole window.
+ * After it has verified, the holder has proven a genuine signed update for
+ * this very image, and only a stall of that long releases it.
+ */
+static bool claim_preemptible(void)
+{
+	int64_t now = tinyfota_uptime_ms();
+
+	if (s_rx.staged) {
+		return false;
+	}
+	if (s_rx.got < HEAD_LEN) {
+		return now - s_rx.begin_ms >= CONFIG_TINYFOTA_CLAIM_IDLE_MS;
+	}
+	return now - s_rx.last_ms >= CONFIG_TINYFOTA_CLAIM_IDLE_MS;
+}
+
+/**
  * Validate the patch size and prepare the receiver
  * to accept upload: initialize RX state with the write position at the patch offset and mark
  * reception active. Return an error code.
@@ -505,13 +531,28 @@ static enum tinyfota_err begin_at(enum tinyfota_owner owner,
 	 * bytes after an idle timeout.
 	 *
 	 * tinyfota's sample reserves a second connection for updates, so that leg
-	 * does NOT hold there.
+	 * does NOT hold there, and the fix is built: claim_preemptible() below.
+	 * Idle alone would not be enough, because a peer with no signed header
+	 * can trickle one byte at a time and never be idle, so an unauthenticated
+	 * claim gets a hard deadline from BEGIN instead.
 	 */
 	if (s_rx.owner != TINYFOTA_OWNER_NONE) {
 		if (s_rx.owner == owner && s_rx.transfer_id == transfer_id && s_rx.total == total) {
 			return TINYFOTA_ERR_OK;
 		}
-		return TINYFOTA_ERR_BUSY;
+		if (!claim_preemptible()) {
+			return TINYFOTA_ERR_BUSY;
+		}
+		LOG_WRN("stalled transfer taken over after %u ms",
+			(unsigned)CONFIG_TINYFOTA_CLAIM_IDLE_MS);
+#ifdef CONFIG_TINYFOTA_SMP_IMG
+		/* An SMP caller has just measured its own upload into these;
+		 * any other new owner leaves them stale. */
+		if (owner != TINYFOTA_OWNER_SMP) {
+			smp_cursor_reset_locked();
+		}
+#endif
+		rx_state_reset_locked();
 	}
 	if (staging_open() != 0) {
 		return TINYFOTA_ERR_FLASH;
@@ -526,12 +567,16 @@ static enum tinyfota_err begin_at(enum tinyfota_owner owner,
 	s_rx.transfer_id = transfer_id;
 	s_rx.total = total;
 	s_rx.wpos = TINYFOTA_PATCH_OFFSET;
+	s_rx.begin_ms = tinyfota_uptime_ms();
+	s_rx.last_ms = s_rx.begin_ms;
 	LOG_INF("update begun, %u B", (unsigned)total);
 	return TINYFOTA_ERR_OK;
 }
 
 static enum tinyfota_err feed_bytes(const uint8_t *p, size_t n)
 {
+	size_t taken = n;
+
 	if (!s_rx.active) {
 		return TINYFOTA_ERR_SEQUENCE;
 	}
@@ -578,6 +623,11 @@ static enum tinyfota_err feed_bytes(const uint8_t *p, size_t n)
 		s_rx.got += n;
 	}
 
+	/* Only bytes taken count as progress: an empty DATA frame must not keep
+	 * a stalled claim alive (claim_preemptible). */
+	if (taken > 0U) {
+		s_rx.last_ms = tinyfota_uptime_ms();
+	}
 	return TINYFOTA_ERR_OK;
 }
 
@@ -777,7 +827,16 @@ static int rx_upload_locked(uint32_t off, uint32_t total, const uint8_t *data, s
 	}
 	if (s_rx.owner != TINYFOTA_OWNER_NONE &&
 	    s_rx.owner != TINYFOTA_OWNER_SMP) {
-		return -EBUSY;
+		if (!claim_preemptible()) {
+			return -EBUSY;
+		}
+		/* Another transport's claim has stalled. Only a fresh upload may
+		 * take it over (begin_at, below): a chunk from anywhere else is
+		 * told to start again, or it would land in the other transfer. */
+		if (off != 0U) {
+			*next = 0U;
+			return 0;
+		}
 	}
 	if (off == 0U && s_rx.owner == TINYFOTA_OWNER_SMP && s_cli_off > 0U) {
 		*next = s_cli_off;

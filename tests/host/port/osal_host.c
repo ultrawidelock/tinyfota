@@ -8,7 +8,6 @@
  */
 #if defined(TINYFOTA_PORT_HOST)
 
-#include <time.h>
 
 #include "tinyfota_host.h"
 
@@ -139,15 +138,14 @@ void tinyfota_osal_host_reset(void)
 
 /* ---- time and lock ------------------------------------------------------------ */
 
-/* Real monotonic time, as the source's host port had it. The receiver's
- * window-expiry path does not read it on host (see TINYFOTA_PORT_HOST in
- * dfu_receiver.c), so the virtual clock above is what the suites drive. */
+/* The virtual clock above. The source's host port returned real monotonic
+ * time here, which nothing could step; tinyfota's claim takeover reads uptime
+ * to decide whether a transfer has stalled, so the suites have to drive it. The
+ * window-expiry path still does not read it on host (TINYFOTA_PORT_HOST in
+ * dfu_receiver.c). */
 int64_t tinyfota_uptime_ms(void)
 {
-	struct timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+	return g_now_ms;
 }
 
 /* Single-threaded: the lock cannot block, so it only counts depth. */

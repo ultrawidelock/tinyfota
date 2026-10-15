@@ -90,6 +90,19 @@ config TINYFOTA_WINDOW_MS
 	  interval that the application is also using, short enough that an
 	  owner who opened it and walked away is not leaving it open all day.
 
+config TINYFOTA_CLAIM_IDLE_MS
+	int "How long a stalled transfer holds the receiver, milliseconds"
+	default 10000
+	range 1000 300000
+	help
+	  The first peer to send BEGIN claims the receiver before anything is
+	  authenticated. Another peer's BEGIN takes the claim over when the
+	  holder has not authenticated (sent a header whose signature verifies)
+	  within this long of its BEGIN, or has authenticated but sent no new
+	  bytes for this long. A staged update is never taken over. Ten seconds
+	  is ample for the signed preamble and for a connection-parameter update
+	  mid-transfer.
+
 config TINYFOTA_BLE
 	bool "BLE transport: an L2CAP CoC and a GATT characteristic"
 	default y
