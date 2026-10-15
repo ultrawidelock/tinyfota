@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Content-Security-Policy. Derived from what this page does: its scripts and the
+     release index are same-origin, the styles are the one inline block below, and
+     nothing embeds or is embedded. If the page stops working after an edit, check
+     the browser console for a CSP violation before anything else. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               connect-src 'self';
+               object-src 'none';
+               base-uri 'self';
+               form-action 'none';
+               frame-ancestors 'none'">
+<title>tinyfota update</title>
+<meta name="description" content="Update a tinyfota board over Bluetooth or a USB cable, from a release index or a .wdfu file.">
+<style>
+:root {
+  --bg: #fbfbf9; --fg: #1d1f21; --muted: #5d6166; --line: #d9dbd6;
+  --panel: #ffffff; --accent: #2457c5; --ok: #1f7a3f; --warn: #a15c00; --danger: #b3261e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a; --fg: #e8e9e6; --muted: #a2a6ab; --line: #34383d;
+    --panel: #1d2024; --accent: #7aa2ff; --ok: #6cc788; --warn: #e3a54a; --danger: #ff8a80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171a; --fg: #e8e9e6; --muted: #a2a6ab; --line: #34383d;
+  --panel: #1d2024; --accent: #7aa2ff; --ok: #6cc788; --warn: #e3a54a; --danger: #ff8a80;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
+p { color: var(--muted); margin: .5rem 0; }
+code { font-size: .9em; }
+.panel {
+  margin-top: 1.5rem; padding: 1rem; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.row { display: grid; grid-template-columns: 6rem 1fr; gap: .75rem; align-items: center;
+       margin-bottom: .75rem; }
+.row[hidden] { display: none; }
+label { font-weight: 600; }
+select, input[type="file"] { width: 100%; min-width: 0; font: inherit; color: inherit; }
+select { padding: .4rem; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+button {
+  font: inherit; font-weight: 600; padding: .6rem 1rem; border: 0; border-radius: 6px;
+  background: var(--accent); color: var(--bg); cursor: pointer; width: 100%;
+}
+button:disabled { opacity: .6; cursor: default; }
+/* The status line. data-kind carries the state so nothing has to add and
+   remove classes to keep it honest. */
+#fota-out {
+  margin-top: 1rem; padding: .75rem 1rem; border-left: 4px solid var(--line);
+  background: var(--bg); border-radius: 4px; overflow-wrap: anywhere;
+}
+#fota-out strong { display: block; }
+#fota-out p { margin: .4rem 0 0; font-size: .95rem; }
+#fota-out[data-kind="ok"] { border-left-color: var(--ok); }
+#fota-out[data-kind="warn"] { border-left-color: var(--warn); }
+#fota-out[data-kind="err"] { border-left-color: var(--danger); }
+#fota-out[data-kind="busy"], #fota-out[data-kind="prompt"] { border-left-color: var(--accent); }
+#fota-out[data-kind="prompt"] strong { font-size: 1.15rem; }
+.fota-bar {
+  position: relative; height: 1.6rem; margin-top: .75rem; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.fota-bar[hidden] { display: none; }
+.fota-bar > span { display: block; height: 100%; width: 0; background: var(--accent);
+                   opacity: .35; transition: width .25s; }
+.fota-bar::after {
+  content: attr(data-label); position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; font-size: .85rem;
+}
+@media (prefers-reduced-motion: reduce) { .fota-bar > span { transition: none; } }
+@media (max-width: 30rem) { .row { grid-template-columns: 1fr; gap: .25rem; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Update a tinyfota board</h1>
+<p>Over Bluetooth with no cable, or down a USB cable. The board is identified first, so
+you find out what applies to it <em>before</em> you press anything on it. Nothing is
+written until you open the update window on the board itself.</p>
+<p>Needs Chrome or Edge on a computer, or Chrome on Android: Web Bluetooth and WebSerial
+are not in Safari or Firefox.</p>
+
+<div class="panel">
+  <div class="row">
+    <label for="fota-target">Board</label>
+    <select id="fota-target">
+      <option value="">loading…</option>
+    </select>
+  </div>
+  <!-- A file from this computer instead of the release index: a .wdfu from
+       `tinyfota build`, or the .bin `tinyfota wrap` makes of it. -->
+  <div class="row">
+    <label for="fota-file">Or a file</label>
+    <input id="fota-file" type="file" accept=".wdfu,.bin">
+  </div>
+  <!-- Hidden until init() finds more than one usable transport. Web Bluetooth
+       and WebSerial are both Chromium-only but not identically: Chrome on
+       Android has the first and not the second. -->
+  <div class="row" id="fota-how-row" hidden>
+    <label for="fota-how">How</label>
+    <select id="fota-how"></select>
+  </div>
+  <button id="fota-go">Find my board</button>
+  <div id="fota-out" data-kind="idle" role="status" aria-live="polite">
+    <strong>Checking what is published…</strong>
+  </div>
+  <div id="fota-bar" class="fota-bar" role="progressbar" aria-valuemin="0"
+       aria-valuemax="100" data-label="" hidden><span></span></div>
+</div>
+
+<p>The release index is <code>ota/ota-index.json</code> beside this page, as
+<code>tinyfota release --out-dir ota</code> writes it. A board running an image no
+published update starts from has no over-the-air path; with a whole image published,
+<strong>reinstall everything</strong> writes it through MCUboot's serial recovery
+instead.</p>
+</main>
+<script type="module" src="fota.js"></script>
+</body>
+</html>
