@@ -139,26 +139,30 @@ int tinyfota_ecdsa_p256_verify(const uint8_t pub[65], const uint8_t *msg, size_t
 
 #else /* !__ZEPHYR__ */
 
+/* Each guarded, so a platform logger included first keeps its own. */
+#ifndef LOG_MODULE_REGISTER
 /* Expands to a declaration, so the `;` after it is not a stray one. */
 #define LOG_MODULE_REGISTER(...) struct tinyfota_log_module_unused
-#define LOG_MODULE_DECLARE(...)  struct tinyfota_log_module_unused
+#endif
+#ifndef LOG_MODULE_DECLARE
+#define LOG_MODULE_DECLARE(...) struct tinyfota_log_module_unused
+#endif
 
 #if defined(TINYFOTA_PORT_LOG) && TINYFOTA_PORT_LOG
 /* Optional seam: a port that wants the core's diagnostics defines
  * TINYFOTA_PORT_LOG=1 and provides this. @p level is 1 (error) to 4 (debug). */
 void tinyfota_log(int level, const char *fmt, ...);
-#define LOG_ERR(...)         tinyfota_log(1, __VA_ARGS__)
-#define LOG_WRN(...)         tinyfota_log(2, __VA_ARGS__)
-#define LOG_INF(...)         tinyfota_log(3, __VA_ARGS__)
-#define LOG_DBG(...)         tinyfota_log(4, __VA_ARGS__)
-#define TINYFOTA_PRINTK(...) tinyfota_log(3, __VA_ARGS__)
+#define TINYFOTA_LOG_FN(level, ...) tinyfota_log((level), __VA_ARGS__)
 #else
-#define LOG_ERR(...)         ((void)0)
-#define LOG_WRN(...)         ((void)0)
-#define LOG_INF(...)         ((void)0)
-#define LOG_DBG(...)         ((void)0)
-#define TINYFOTA_PRINTK(...) ((void)0)
+#define TINYFOTA_LOG_FN(level, ...) ((void)0)
 #endif
+#ifndef LOG_ERR
+#define LOG_ERR(...) TINYFOTA_LOG_FN(1, __VA_ARGS__)
+#define LOG_WRN(...) TINYFOTA_LOG_FN(2, __VA_ARGS__)
+#define LOG_INF(...) TINYFOTA_LOG_FN(3, __VA_ARGS__)
+#define LOG_DBG(...) TINYFOTA_LOG_FN(4, __VA_ARGS__)
+#endif
+#define TINYFOTA_PRINTK(...) TINYFOTA_LOG_FN(3, __VA_ARGS__)
 
 /* Without SYS_INIT, the applier's entry point is exported as a pointer named
  * tinyfota_init_<fn>. A bootloader calls it before it validates the primary

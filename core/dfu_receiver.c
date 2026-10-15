@@ -335,7 +335,7 @@ static bool head_verifies(void)
 /* ---- the base image ------------------------------------------------------- */
 
 /**
- * True when the primary slot is the image the patch was built from.
+ * Is the primary slot the image the patch was built from?
  *
  * The applier checks the same CRC before it touches the slot, but only after
  * a reboot, by which time the staging partition has already been erased and
@@ -343,19 +343,22 @@ static bool head_verifies(void)
  * erase, turns a patch for another image into an immediate refusal the host
  * can report, with the staging partition left as it was. The header is
  * signed, so from_len and from_crc32 are the signer's claim, not the peer's.
+ *
+ * Returns TINYFOTA_ERR_OK, TINYFOTA_ERR_BASE, or TINYFOTA_ERR_FLASH when the
+ * slot cannot be read at all -- a port fault, not a wrong patch.
  */
-static bool base_matches(void)
+static enum tinyfota_err base_check(void)
 {
 	const struct tinyfota_flash_area *primary;
 	struct tinyfota_hdr hdr;
 	uint8_t buf[64];
 	uint32_t off = 0;
 	uint32_t crc = 0;
-	bool ok = false;
+	enum tinyfota_err e = TINYFOTA_ERR_BASE;
 
 	memcpy(&hdr, s_rx.head, sizeof(hdr));
 	if (tinyfota_flash_open(TINYFOTA_FLASH_AREA_PRIMARY, &primary) != 0) {
-		return false;
+		return TINYFOTA_ERR_FLASH;
 	}
 	if (hdr.from_len <= tinyfota_flash_size(primary)) {
 		while (off < hdr.from_len) {
@@ -367,10 +370,14 @@ static bool base_matches(void)
 			crc = tinyfota_crc32_update(crc, buf, n);
 			off += (uint32_t)n;
 		}
-		ok = (off == hdr.from_len) && (crc == hdr.from_crc32);
+		if (off != hdr.from_len) {
+			e = TINYFOTA_ERR_FLASH;
+		} else if (crc == hdr.from_crc32) {
+			e = (enum tinyfota_err)0;
+		}
 	}
 	tinyfota_flash_close(primary);
-	return ok;
+	return e;
 }
 
 /* ---- frame handling ------------------------------------------------------- */
@@ -546,9 +553,13 @@ static enum tinyfota_err feed_bytes(const uint8_t *p, size_t n)
 				LOG_WRN("rejected: header signature did not verify");
 				return TINYFOTA_ERR_AUTH;
 			}
-			if (!base_matches()) {
-				LOG_WRN("rejected: built for a different image than this one");
-				return TINYFOTA_ERR_BASE;
+			{
+				enum tinyfota_err base = base_check();
+
+				if (base != (enum tinyfota_err)0) {
+					LOG_WRN("rejected: built for a different image than this one");
+					return base;
+				}
 			}
 
 			/* Authenticate before the first destructive operation. A random

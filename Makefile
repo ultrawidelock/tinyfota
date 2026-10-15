@@ -15,15 +15,69 @@ SAN := -g -fsanitize=address,undefined -fno-sanitize-recover=all
 # Mach-O prefixes every C symbol with an underscore; ELF does not.
 SYM_PREFIX := $(if $(filter Darwin,$(shell uname -s)),_,)
 
-TEST_SRCS := $(wildcard tests/host/*.c)
+# Zephyr's clang warning_base, which is what the source's firmware build
+# compiled these files under, plus -Werror.
+WARN := -Wall -Wformat -Wformat-security -Wno-format-zero-length \
+	-Wno-unused-but-set-variable -Wno-typedef-redefinition \
+	-Wno-deprecated-non-prototype -Wdouble-promotion -Wno-pointer-sign \
+	-Wpointer-arith -Werror
 
-.PHONY: test asan seams clean
+# The delta-update suite: both halves of the core, the signature seam over the
+# recording PSA (psafake/), the SMP image group over the zcbor/mcumgr doubles
+# (smpfake/), a scripted detools (dfufake/), and the host port (port/): RAM
+# partitions that enforce the nRF word and page alignment rules, and a virtual
+# clock. CONFIG_MCUMGR_SMP_LEGACY_RC_BEHAVIOUR is on so the explicit "rc" key a
+# legacy client expects is compiled and checked. _DEFAULT_SOURCE because the
+# host port names CLOCK_MONOTONIC, which glibc hides under strict -std=c11;
+# Darwin ignores it.
+# The suite keeps the golden public key beside the vector it belongs to, for
+# the reader, while the receiver links its own copy; hence the one waiver.
+TEST_WARN := $(WARN) -Wno-unused-const-variable
+TEST_DEFS := -DTINYFOTA_PORT_HOST -D_DEFAULT_SOURCE -DCONFIG_TINYFOTA_SMP_IMG=1 \
+	-DCONFIG_TINYFOTA_APPLIER_CHUNK=256 -DCONFIG_MCUMGR_GRP_OS_RESET_HOOK=1 \
+	-DCONFIG_MCUMGR_GRP_ENUM_DETAILS_NAME=1 -DCONFIG_MCUMGR_SMP_LEGACY_RC_BEHAVIOUR=1
+TEST_INCS := -Itests/host -Itests/host/port -Itests/host/dfufake -Itests/host/smpfake \
+	-Itests/host/logfake -Itests/host/psafake -Iinclude -Icore
+TEST_SRCS := tests/host/test.c tests/host/test_dfu.c tests/host/test_dfu_smp.c \
+	tests/host/dfufake/dfufake.c tests/host/smpfake/smpfake.c tests/host/psafake/psafake.c \
+	tests/host/port/osal_host.c tests/host/port/flash_host.c \
+	core/dfu_crc.c core/dfu_receiver.c core/dfu_applier.c \
+	ports/zephyr/crypto_psa.c ports/zephyr/dfu_smp_img.c
+TEST_HDRS := $(wildcard include/tinyfota/*.h core/*.h tests/host/*.h tests/host/*/*.h \
+	tests/host/*/*/*.h tests/host/*/*/*/*.h tests/host/*/*/*/*/*.h tests/host/*/*/*/*/*/*.h)
 
-test:
-	@if [ -z "$(TEST_SRCS)" ]; then echo "make test: no host tests yet"; fi
+# Behaviour tinyfota added to the imported core, in its own binary so the
+# imported suite above stays check-for-check identical to the source's.
+ADD_SRCS := tests/host/test.c tests/host/test_tinyfota.c \
+	tests/host/dfufake/dfufake.c tests/host/psafake/psafake.c \
+	tests/host/port/osal_host.c tests/host/port/flash_host.c \
+	core/dfu_crc.c core/dfu_receiver.c ports/zephyr/crypto_psa.c
 
-asan:
-	@if [ -z "$(TEST_SRCS)" ]; then echo "make asan: no host tests yet"; fi
+.PHONY: test asan seams wire clean
+
+$(BUILD)/host_test_dfu: $(TEST_SRCS) $(TEST_HDRS)
+	@mkdir -p $(@D)
+	$(CC) $(CSTD) $(TEST_WARN) $(TEST_DEFS) $(TEST_INCS) $(TEST_SRCS) -o $@
+
+$(BUILD)/host_test_dfu_asan: $(TEST_SRCS) $(TEST_HDRS)
+	@mkdir -p $(@D)
+	$(CC) $(CSTD) $(TEST_WARN) $(SAN) $(TEST_DEFS) $(TEST_INCS) $(TEST_SRCS) -o $@
+
+$(BUILD)/host_test_tinyfota: $(ADD_SRCS) $(TEST_HDRS)
+	@mkdir -p $(@D)
+	$(CC) $(CSTD) $(TEST_WARN) $(TEST_DEFS) $(TEST_INCS) $(ADD_SRCS) -o $@
+
+$(BUILD)/host_test_tinyfota_asan: $(ADD_SRCS) $(TEST_HDRS)
+	@mkdir -p $(@D)
+	$(CC) $(CSTD) $(TEST_WARN) $(SAN) $(TEST_DEFS) $(TEST_INCS) $(ADD_SRCS) -o $@
+
+test: $(BUILD)/host_test_dfu $(BUILD)/host_test_tinyfota
+	$(BUILD)/host_test_dfu
+	$(BUILD)/host_test_tinyfota
+
+asan: $(BUILD)/host_test_dfu_asan $(BUILD)/host_test_tinyfota_asan
+	$(BUILD)/host_test_dfu_asan
+	$(BUILD)/host_test_tinyfota_asan
 
 # The symbols the core leaves for a port to provide: everything a core object
 # references that no core or vendored object defines. The vendored detools is
@@ -57,6 +111,11 @@ seams:
 	echo "libc, not a seam: $$(grep -E '$(LIBC_RE)' $(BUILD)/seams/all.txt | tr '\n' ' ')"; \
 	diff -u tests/seams.expected $(BUILD)/seams/seams.txt && \
 	echo "make seams: $$(wc -l < $(BUILD)/seams/seams.txt | tr -d ' ') symbols, matches tests/seams.expected"
+
+# The browser's copy of the update protocols against the Python tool, byte for
+# byte (tests/tooling/fota_wire_check.sh). Needs python3 and node.
+wire:
+	tests/tooling/fota_wire_check.sh
 
 clean:
 	rm -rf build
