@@ -38,7 +38,8 @@ XOR `0xFFFFFFFF`, which is Python's `zlib.crc32`.
 
 The signature covers all 32 bytes, so no field can change without the key.
 `hdr_crc32` is the last field and is written last, so a torn header write fails
-its own check.
+its own check. The patch bytes are tied to the signature only through
+`patch_len` and `patch_crc32`, and a CRC is not a cryptographic hash.
 
 Example, the header the host suite's real-signature vector uses
 (`tests/host/gen_dfu_vector.py`), 70 B patch, no base:
