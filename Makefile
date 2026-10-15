@@ -53,7 +53,7 @@ ADD_SRCS := tests/host/test.c tests/host/test_tinyfota.c \
 	tests/host/port/osal_host.c tests/host/port/flash_host.c \
 	core/dfu_crc.c core/dfu_receiver.c ports/zephyr/crypto_psa.c
 
-.PHONY: test asan seams wire clean
+.PHONY: test asan seams wire tooling clean
 
 $(BUILD)/host_test_dfu: $(TEST_SRCS) $(TEST_HDRS)
 	@mkdir -p $(@D)
@@ -116,6 +116,14 @@ seams:
 # byte (tests/tooling/fota_wire_check.sh). Needs python3 and node.
 wire:
 	tests/tooling/fota_wire_check.sh
+
+# The host tool's own guarantees: the release index (python -m tinyfota.index
+# --self-test) and the release fan (tests/tooling/release_check.py). PY must be
+# a Python with tools/tinyfota installed, e.g. make tooling PY=.venv/bin/python
+PY ?= python3
+tooling:
+	$(PY) -m tinyfota.index --self-test
+	$(PY) tests/tooling/release_check.py
 
 clean:
 	rm -rf build

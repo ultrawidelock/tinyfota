@@ -630,8 +630,8 @@ async def run(args):
         await converse(smp, args)
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Push a delta patch over SMP, as a phone would.")
+def add_arguments(ap):
+    """The `push` options, shared by `tinyfota push` and this module's main()."""
     ap.add_argument("patch", nargs="?", help="the .wdfu from tinyfota build, or its wrapped .bin")
     ap.add_argument("--list", action="store_true", help="read the image list and stop")
     ap.add_argument(
@@ -641,7 +641,7 @@ def main():
     )
     ap.add_argument("--address", default="",
                     help="the board to use when more than one advertises the SMP service")
-    # 12 s, not 8. MEASURED: two consecutive 8 s scans missed a board sitting at
+    # 12 s, not 8. MEASURED in ultrawidelock: two consecutive 8 s scans missed a board sitting at
     # -60 dBm that a 12 s scan then found immediately. CoreBluetooth filters
     # duplicates across back-to-back discovery sessions, so a board that is
     # plainly present can simply not be reported to a short window -- and the
@@ -649,8 +649,8 @@ def main():
     # conclusion entirely.
     ap.add_argument("--scan", type=float, default=12.0, help="scan seconds")
     ap.add_argument("--no-reset", action="store_true", help="stage without rebooting")
-    # THE CABLE. uart0 is the J-Link OB's VCOM, so this is the port the probe
-    # already presents -- no second cable, and no scan.
+    # THE CABLE. On the DWM3001CDK uart0 is the J-Link OB's VCOM, so this is the
+    # port the probe already presents -- no second cable, and no scan.
     ap.add_argument(
         "--serial",
         metavar="PORT",
@@ -662,18 +662,32 @@ def main():
     # 384 leaves room under CONFIG_MCUMGR_TRANSPORT_UART_MTU=512 for the 8-byte
     # header and the CBOR map. It suits MCUboot too, whose ceiling is HIGHER
     # than the application's -- BOOT_SERIAL_MAX_RECEIVE_SIZE is 1024 -- and not
-    # lower as this once claimed. Measured against a board in serial recovery:
+    # lower as this once claimed. Measured in ultrawidelock against a board in serial recovery:
     # 128 runs at ~500 B/s and 384 at ~1.6 KB/s, which on a 406 KB image is 13
     # minutes against 4.
     ap.add_argument("--chunk", type=int, default=384,
                     help="serial upload payload per request; suits both the "
                          "application and MCUboot")
-    args = ap.parse_args()
 
+
+def push(args):
+    """`tinyfota push`: the whole exchange, over Bluetooth or the cable."""
     if not args.list and not args.expect and not args.patch:
-        ap.error("give a patch file, or --list, or --expect")
-
+        die("give a patch file, or --list, or --expect")
     asyncio.run(run(args))
+
+
+def add_parser(sub):
+    p = sub.add_parser("push", help="push a patch over SMP, by Bluetooth or serial, "
+                                    "as a phone would")
+    add_arguments(p)
+    p.set_defaults(func=push)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Push a delta patch over SMP, as a phone would.")
+    add_arguments(ap)
+    push(ap.parse_args())
 
 
 if __name__ == "__main__":

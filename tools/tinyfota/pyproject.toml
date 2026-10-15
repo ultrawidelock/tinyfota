@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tinyfota"
+version = "0.1.0"
+description = "Signed, power-cut-safe delta firmware updates for single-slot MCUboot boards"
+readme = "README.md"
+license = { text = "ISC" }
+requires-python = ">=3.9"
+# detools is pinned: it writes the patch, and the same version on every machine
+# is what makes a patch reproducible. It is published as a source distribution
+# only, so installing it compiles C and C++ (see README.md).
+dependencies = [
+    "detools==0.53.0",
+    "cryptography>=41",
+    "bleak>=0.22",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+tinyfota = "tinyfota.cli:main"
+
+[tool.setuptools]
+packages = ["tinyfota"]
