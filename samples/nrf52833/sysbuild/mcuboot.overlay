@@ -1,9 +1,17 @@
 /* SPDX-License-Identifier: ISC */
 
+#include "../partitions.dtsi"
+
 /* The application (boards/*.overlay) and MCUboot must name the same retained
- * GPREGRET2 byte. Both boards in this sample have it. */
+ * GPREGRET2 byte. Both boards in this sample have it.
+ *
+ * This file replaces MCUboot's own boot/zephyr/app.overlay, so its one line,
+ * the code partition, is repeated here. Without it upstream Zephyr links
+ * MCUboot into slot0_partition, the board's default; NCS hides the mistake
+ * because Partition Manager places MCUboot itself. */
 / {
 	chosen {
+		zephyr,code-partition = &boot_partition;
 		zephyr,boot-mode = &mcuboot_recovery_mode;
 	};
 };

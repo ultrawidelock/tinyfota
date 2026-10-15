@@ -7,8 +7,9 @@ their firmware. Signed. Survives power cuts. Sends only what changed.
 
 Extracted from ultrawidelock@d6e23761.
 
-**Status:** passes every host test (unit, sanitizers, power-cut, fuzz). Not
-yet run on a board; the source project proved the browser path on hardware.
+**Status:** passes every host test (unit, sanitizers, power-cut, fuzz) and
+builds on upstream Zephyr v4.4.2 and NCS v3.3.0. Not yet run on a board; the
+source project proved the browser path on hardware.
 
 ## How it works
 
@@ -56,14 +57,25 @@ A normal update needs room for two full copies. This chip has room for one.
 
 ## Quick start
 
-Needs: NCS v3.3.0 (`nrfutil sdk-manager install v3.3.0`), Python 3.9+, a C
-and C++ compiler (`tools/tinyfota/README.md` has the details).
+Needs one SDK from the table, Python 3.12+ and a C and C++ compiler
+(`tools/tinyfota/README.md` has the details). Upstream Zephyr needs nothing
+from Nordic.
+
+| SDK | Get it |
+|---|---|
+| Upstream Zephyr v4.4.2 | step 0 below |
+| NCS v3.3.0 | `nrfutil sdk-manager install v3.3.0`, then skip step 0 |
 
 ```sh
+# 0. upstream Zephyr: workspace, Python packages, toolchain (in a venv)
+pip install west
+west init -m https://github.com/zephyrproject-rtos/zephyr --mr v4.4.2 zephyrproject
+cd zephyrproject && west update && west packages pip --install && west sdk install
+
 # 1. install the host tool
 python3 -m venv .venv && . .venv/bin/activate && pip install ./tools/tinyfota
 
-# 2. from the NCS workspace: build and flash v1, keep the build
+# 2. from the workspace root: build and flash v1, keep the build
 west build -b nrf52833dk/nrf52833 --sysbuild -d build/v1 <tinyfota>/samples/nrf52833
 west flash -d build/v1
 
@@ -73,7 +85,7 @@ west build -b nrf52833dk/nrf52833 --sysbuild -d build/v2 <tinyfota>/samples/nrf5
 # 4. make the update and send it; press sw0 on the board when asked
 tinyfota build --from build/v1/nrf52833/zephyr/zephyr.signed.hex \
     --to build/v2/nrf52833/zephyr/zephyr.signed.hex \
-    --build-dir build/v2 --key <ncs>/bootloader/mcuboot/root-ec-p256.pem \
+    --build-dir build/v2 --key <workspace>/bootloader/mcuboot/root-ec-p256.pem \
     --out update.wdfu
 tinyfota push update.wdfu
 ```
@@ -93,14 +105,14 @@ tinyfota push update.wdfu
 
 ## Numbers
 
-Measured 2026-10-16, NCS v3.3.0, nRF52833 DK.
+Measured 2026-10-16 on the nRF52833 DK.
 
-| What                              | Size                          |
-|-----------------------------------|-------------------------------|
-| Added to the bootloader           | 3,776 B flash, 1,072 B RAM    |
-| Bootloader total                  | 33,888 B of 40,960 B          |
-| Staging area                      | 32 KB, of which 24 KB update  |
-| Update after changing one setting | 3,645 B, 1.91% of the image   |
+| What                              | Upstream Zephyr v4.4.2       | NCS v3.3.0                  |
+|-----------------------------------|------------------------------|-----------------------------|
+| Added to the bootloader           | 3,744 B flash, 1,088 B RAM   | 3,776 B flash, 1,072 B RAM  |
+| Bootloader total                  | 32,840 B of 40,960 B         | 33,888 B of 40,960 B        |
+| Staging area                      | 32 KB, of which 24 KB update | same                        |
+| Update after changing one setting | 3,611 B, 1.91% of the image  | 3,645 B, 1.91% of the image |
 
 ## Proof
 
@@ -118,6 +130,7 @@ Measured 2026-10-16, NCS v3.3.0, nRF52833 DK.
 | No rollback: a bad image needs a cable and MCUboot serial recovery | v0.3     |
 | MCUboot on Zephyr only                                             | v0.4     |
 | One update must fit in 24 KB                                       |          |
+| Upstream Zephyr cannot write-lock MCUboot's flash                  |          |
 
 ## Develop
 

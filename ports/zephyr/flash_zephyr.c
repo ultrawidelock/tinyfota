@@ -2,9 +2,9 @@
 
 /*
  * flash_zephyr.c - the Zephyr backend of the flash seams in tinyfota_port.h: flash_map areas named
- * by the partition-manager ids from pm_config.h, so the mapping is decided
+ * by partition label (tinyfota/tinyfota_partitions.h), so the mapping is decided
  * by the image that compiles this file (app and MCUboot both build tinyfota,
- * each against its own pm_config.h). Alignment is the driver's to enforce
+ * each against its own partition map). Alignment is the driver's to enforce
  * here; the host backend enforces the same rules deliberately.
  */
 #if defined(__ZEPHYR__)
@@ -15,14 +15,14 @@
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
-#include <pm_config.h>
-
 #include "tinyfota.h"
+#include "tinyfota/tinyfota_partitions.h"
 #include "tinyfota/tinyfota_port.h"
 
 static uint8_t pm_id_of(enum tinyfota_flash_area_id id)
 {
-	return id == TINYFOTA_FLASH_AREA_PRIMARY ? PM_MCUBOOT_PRIMARY_ID : PM_PATCH_STAGING_ID;
+	return id == TINYFOTA_FLASH_AREA_PRIMARY ? TINYFOTA_PARTITION_ID(slot0_partition)
+						 : TINYFOTA_PARTITION_ID(patch_staging);
 }
 
 /*

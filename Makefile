@@ -189,12 +189,14 @@ wire:
 	tests/tooling/fota_wire_check.sh
 
 # The host tool's own guarantees: the release index (python -m tinyfota.index
-# --self-test) and the release fan (tests/tooling/release_check.py). PY must be
-# a Python with tools/tinyfota installed, e.g. make tooling PY=.venv/bin/python
+# --self-test), the release fan (tests/tooling/release_check.py), and the
+# sample's NCS and upstream flash maps agreeing (partition_map_check.py). PY must
+# be a Python with tools/tinyfota installed, e.g. make tooling PY=.venv/bin/python
 PY ?= python3
 tooling:
 	$(PY) -m tinyfota.index --self-test
 	$(PY) tests/tooling/release_check.py
+	$(PY) tests/tooling/partition_map_check.py
 
 clean:
 	rm -rf build

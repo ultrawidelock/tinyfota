@@ -40,10 +40,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <pm_config.h>
-
 #include "tinyfota.h"
 #include "tinyfota_rx.h"
+#include "tinyfota/tinyfota_partitions.h"
 #include "tinyfota/tinyfota_port.h"
 
 #include <zephyr/logging/log.h>
@@ -117,7 +116,8 @@ struct image_tlv {
  * and a copy would only cost stack. */
 static const struct image_header *running_header(void)
 {
-	const struct image_header *h = (const struct image_header *)PM_MCUBOOT_PAD_ADDRESS;
+	const struct image_header *h =
+		(const struct image_header *)TINYFOTA_PARTITION_ADDRESS(slot0_partition);
 
 	return (h->ih_magic == IMAGE_MAGIC) ? h : NULL;
 }

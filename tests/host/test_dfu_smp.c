@@ -86,7 +86,7 @@ static void ready(void)
 /* ---- the running image's identity ----------------------------------------- */
 
 /**
- * Lay an MCUboot image out at PM_MCUBOOT_PAD_ADDRESS: header, a body of the
+ * Lay an MCUboot image out at the slot0_partition address: header, a body of the
  * declared size, then a TLV block. @p prot_first prepends a protected TLV
  * block, which the reader has to step over to find the real one.
  */

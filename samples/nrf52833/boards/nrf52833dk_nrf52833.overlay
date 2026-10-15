@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: ISC */
 
+#include "../partitions.dtsi"
+
 /* The recovery gesture (CONFIG_TINYFOTA_RECOVERY_GESTURE): the application
  * writes a one-shot request into GPREGRET2 and warm-resets; MCUboot reads the
  * same byte (sysbuild/mcuboot.overlay) and enters serial recovery. GPREGRET2

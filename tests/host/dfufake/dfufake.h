@@ -47,8 +47,9 @@ extern struct dfufake_state dfufake;
 
 /**
  * The bytes dfu_smp_img.c reads as the RUNNING image. On target that is the
- * primary slot mapped at PM_MCUBOOT_PAD_ADDRESS and read straight through a
- * pointer; here pm_config.h points that macro at this buffer, so a suite lays
+ * primary slot mapped at PARTITION_ADDRESS(slot0_partition) and read straight
+ * through a pointer; here zephyr/storage/flash_map.h points that macro at this
+ * buffer, so a suite lays
  * out a header and a TLV block and then asks what the module reports.
  */
 extern uint8_t dfufake_running_image[];

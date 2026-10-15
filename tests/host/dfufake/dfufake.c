@@ -13,7 +13,7 @@
 
 struct dfufake_state dfufake;
 
-/* dfu_smp_img.c reads the running image through PM_MCUBOOT_PAD_ADDRESS. One
+/* dfu_smp_img.c reads the running image through PARTITION_ADDRESS. One
  * page is more than enough for a header plus a TLV block. */
 uint8_t dfufake_running_image[DFUFAKE_PAGE_SIZE];
 

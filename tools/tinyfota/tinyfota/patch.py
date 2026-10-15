@@ -161,8 +161,13 @@ def die(msg, code=1):
     sys.exit(code)
 
 
+# Each partition's Partition Manager name (NCS, pm_static.yml) and its
+# devicetree label (upstream Zephyr, samples/nrf52833/partitions.dtsi).
+DT_LABELS = {"mcuboot_primary": "slot0_partition", "patch_staging": "patch_staging"}
+
+
 def partition(build_dir, name):
-    """Read one partition's size out of a build's generated partitions.yml.
+    """Read one partition's size out of a build's generated partition map.
 
     Parsed rather than hardcoded because the whole update path is invalid if
     the host and the board disagree about how big the slot is, and the
@@ -172,19 +177,54 @@ def partition(build_dir, name):
 
 
 def partition_field(build_dir, name, field):
-    """One numeric field of one partition in a build's partitions.yml."""
+    """One numeric field of one partition: from the build's partitions.yml on
+    NCS, else from its devicetree, since upstream Zephyr has no Partition
+    Manager."""
     path = Path(build_dir) / "partitions.yml"
     if not path.is_file():
-        die(f"no partitions.yml in {build_dir} -- build it first")
+        path = build_dts(build_dir)
+        value = dts_partition_field(path.read_text(), DT_LABELS[name], field)
+    else:
+        value = pm_partition_field(path.read_text(), name, field)
+    if value is None:
+        die(f"no {field} for partition '{name}' in {path}")
+    return value
 
-    text = path.read_text()
-    match = re.search(rf"^{name}:$(.*?)(?=^\S)", text, re.M | re.S)
+
+def pm_partition_field(text, name, field):
+    """One field of one partition in a Partition Manager map, or None."""
+    match = re.search(rf"^{name}:$(.*?)(?=^\S|\Z)", text, re.M | re.S)
     if not match:
-        die(f"no '{name}' partition in {path}")
+        return None
     value = re.search(rf"^\s+{field}:\s*(0x[0-9a-fA-F]+|\d+)\s*$", match.group(1), re.M)
-    if not value:
-        die(f"'{name}' in {path} has no {field}")
-    return int(value.group(1), 0)
+    return int(value.group(1), 0) if value else None
+
+
+def dts_partition_field(text, label, field):
+    """One field of one partition in devicetree source, or None. The address
+    is the reg offset within the flash, which is the address on a part whose
+    flash starts at 0, as the nRF52's does; elsewhere pass --load-address."""
+    match = re.search(
+        rf"\b{label}:\s*partition@[0-9a-fA-F]+\s*\{{[^}}]*?\breg\s*=\s*"
+        r"<\s*(0x[0-9a-fA-F]+|\d+)\s+(0x[0-9a-fA-F]+|\d+)\s*>", text)
+    if not match:
+        return None
+    return int(match.group(1 if field == "address" else 2), 0)
+
+
+def build_dts(build_dir):
+    """The application's zephyr.dts: a sysbuild directory names the
+    application in domains.yaml; a single-image one is the application."""
+    build_dir = Path(build_dir)
+    path = build_dir / "zephyr" / "zephyr.dts"
+    domains = build_dir / "domains.yaml"
+    if domains.is_file():
+        default = re.search(r"^default:\s*(\S+)\s*$", domains.read_text(), re.M)
+        if default:
+            path = build_dir / default.group(1) / "zephyr" / "zephyr.dts"
+    if not path.is_file():
+        die(f"no partitions.yml or zephyr.dts in {build_dir} -- build it first")
+    return path
 
 
 def read_ihex(text):
@@ -613,7 +653,7 @@ def add_parsers(sub):
     b.add_argument("--key", required=True,
                    help="signs the header; same key MCUboot verifies images with")
     b.add_argument("--build-dir",
-                   help="read the slot and staging sizes from its partitions.yml")
+                   help="read the slot and staging sizes from its partition map")
     b.add_argument("--memory-size", type=lambda v: int(v, 0),
                    help="mcuboot_primary size, if not using --build-dir")
     b.add_argument("--staging-size", type=lambda v: int(v, 0),
@@ -650,7 +690,7 @@ def add_parsers(sub):
     w.add_argument("--soc", default="", help="the SoC, for the zip manifest")
     w.add_argument("--load-address", type=lambda v: int(v, 0), default=None,
                    help="the primary slot's address, for the zip manifest")
-    w.add_argument("--build-dir", help="read --load-address from its partitions.yml")
+    w.add_argument("--build-dir", help="read --load-address from its partition map")
     w.set_defaults(func=wrap)
 
 

@@ -150,7 +150,7 @@ def add_parser(sub):
     r.add_argument("--target", default="default", help="the index key for this board")
     r.add_argument("--name", default="", help="the board name the page shows")
     r.add_argument("--build-dir",
-                   help="read the slot and staging sizes from its partitions.yml")
+                   help="read the slot and staging sizes from its partition map")
     r.add_argument("--memory-size", type=lambda v: int(v, 0),
                    help="mcuboot_primary size, if not using --build-dir")
     r.add_argument("--staging-size", type=lambda v: int(v, 0),

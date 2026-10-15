@@ -61,7 +61,9 @@ bootloader. The receiver, in the application, needs all of them.
 
 ## The sample layout
 
-`samples/nrf52833/pm_static.yml`, for 512 KB of flash:
+`samples/nrf52833/pm_static.yml` on NCS and `samples/nrf52833/partitions.dtsi`
+on upstream Zephyr, the same addresses in both (`make tooling` checks), for
+512 KB of flash:
 
 | Partition | Address | Size |
 |---|---|---|
@@ -70,8 +72,8 @@ bootloader. The receiver, in the application, needs all of them.
 | `patch_staging` | 0x74000 | 32,768 B (0x8000) |
 
 `tinyfota build --build-dir` reads the slot and staging sizes from the build's
-`partitions.yml`. Without a build directory, pass `--memory-size` and
-`--staging-size`.
+`partitions.yml` on NCS, or its `zephyr.dts` on upstream Zephyr. Without a
+build directory, pass `--memory-size` and `--staging-size`.
 
 ## Checking a port
 

@@ -28,8 +28,8 @@ and tinyfota's applier. `sysbuild/mcuboot.conf` says why each line is there.
 
 ## Build
 
-From the root of an NCS v3.3.0 workspace (`nrfutil sdk-manager install v3.3.0`
-makes one):
+From the root of an upstream Zephyr v4.4.2 workspace or an NCS v3.3.0 one
+(the top-level `README.md` says how to make either):
 
 ```
 west build -b nrf52833dk/nrf52833 --sysbuild -d build/tinyfota <tinyfota>/samples/nrf52833
@@ -39,6 +39,16 @@ west flash -d build/tinyfota
 `sysbuild/CMakeLists.txt` adds the tinyfota module to both images, so nothing
 else needs passing. When tinyfota is already a project in your west manifest,
 add `-- -DTINYFOTA_IN_MANIFEST=y`.
+
+The same files build on both. Where the two differ:
+
+| | Upstream Zephyr | NCS |
+|---|---|---|
+| Flash map | `partitions.dtsi` | `pm_static.yml`, same addresses (`make tooling` checks) |
+| Signature check | mbedTLS p256-m | Oberon |
+| MCUboot's flash after boot | writable                         | locked by `FPROTECT` |
+
+`sysbuild.cmake` holds every setting that differs.
 
 The sample signs with MCUboot's published development key unless you set
 `SB_CONFIG_BOOT_SIGNATURE_KEY_FILE`, and the build warns about it. Patches are

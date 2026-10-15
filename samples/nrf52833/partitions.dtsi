@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: ISC */
+
+/* The flash map on upstream Zephyr: the same addresses as pm_static.yml, which
+ * says why each partition is where it is. NCS's Partition Manager reads
+ * pm_static.yml and ignores this file; upstream Zephyr has no Partition Manager
+ * and reads only this. The two must agree, and `make tooling` checks that they
+ * do. Both images include it: MCUboot through sysbuild/mcuboot.overlay, the
+ * application through boards/<board>.overlay.
+ *
+ *   0x00000  boot_partition      40,960 B   MCUboot + the tinyfota applier
+ *   0x0a000  slot0_partition    434,176 B   image header + the application
+ *   0x74000  patch_staging       32,768 B   one delta patch and its control pages
+ *   0x7c000  storage_partition   16,384 B   settings (NVS)
+ *   0x80000  end, 524,288 B: the part exactly
+ */
+&flash0 {
+	/delete-node/ partitions;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000 0x0a000>;
+		};
+
+		slot0_partition: partition@a000 {
+			label = "image-0";
+			reg = <0x0a000 0x6a000>;
+		};
+
+		patch_staging: partition@74000 {
+			label = "patch-staging";
+			reg = <0x74000 0x08000>;
+		};
+
+		storage_partition: partition@7c000 {
+			label = "storage";
+			reg = <0x7c000 0x04000>;
+		};
+	};
+};

@@ -25,9 +25,8 @@
 
 #include <string.h>
 
-#include <pm_config.h>
-
 #include "tinyfota_rx.h"
+#include "tinyfota/tinyfota_partitions.h"
 
 LOG_MODULE_REGISTER(sample, LOG_LEVEL_INF);
 
@@ -137,7 +136,7 @@ static void window_changed(bool open)
  */
 static void report_running_image(void)
 {
-	const uint8_t *base = (const uint8_t *)PM_MCUBOOT_PAD_ADDRESS;
+	const uint8_t *base = (const uint8_t *)TINYFOTA_PARTITION_ADDRESS(slot0_partition);
 	const uint8_t *tlv;
 	const uint8_t *end;
 	uint32_t magic, img_size;
