@@ -1,0 +1,4 @@
+name: tinyfota
+build:
+  cmake: zephyr
+  kconfig: zephyr/Kconfig

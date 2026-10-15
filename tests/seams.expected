@@ -1,0 +1,17 @@
+tinyfota_ecdsa_p256_verify
+tinyfota_flash_close
+tinyfota_flash_erase
+tinyfota_flash_open
+tinyfota_flash_read
+tinyfota_flash_size
+tinyfota_flash_write
+tinyfota_lock
+tinyfota_log
+tinyfota_pubkey
+tinyfota_reboot
+tinyfota_timer_cancel
+tinyfota_timer_init
+tinyfota_timer_reschedule
+tinyfota_timer_schedule
+tinyfota_unlock
+tinyfota_uptime_ms

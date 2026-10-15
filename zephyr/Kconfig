@@ -1,0 +1,157 @@
+# tinyfota: delta firmware update for chips that cannot hold two images. These
+# are the halves that live in flash.
+#
+# The DWM3001CDK (nRF52833, 512 KB) running ultrawidelock's lock image cannot
+# do a conventional over-the-air update, and the arithmetic (measured there) is
+# not close. Two full slots want 844 KB of a 512 KB part;
+# an LZMA-compressed secondary still wants ~646 KB; and there is no external
+# flash to stage into. What fits is a delta -- 10,906 B measured in ultrawidelock
+# between two adjacent builds of its lock image.
+#
+# The two symbols below are deliberately separate and are never both set on one
+# image. The applier goes in the BOOTLOADER, because an application cannot
+# rewrite the flash it is executing from. The receiver goes in the APPLICATION,
+# because the bootloader has no radio.
+
+config TINYFOTA_APPLIER
+	bool "Delta patch applier (bootloader side)"
+	depends on FLASH
+	help
+	  Compile the detools in-place patch applier and run it from a SYS_INIT
+	  at APPLICATION level, which is after the flash driver is up and before
+	  MCUboot's own main().
+
+	  Set this ONLY on the MCUboot image. On the application it would link a
+	  patcher that can never safely run.
+
+	  MEASURED in ultrawidelock at 3,176 B of bootloader flash (29,380 ->
+	  32,556 B), which is why its partition map gives MCUboot 0xA000 rather
+	  than the 0x8000 it needed before: 0x8000 would have left 212 B free.
+	  The README's size table has the number re-measured for this module.
+
+	  Nothing happens at boot unless a valid header is found in the
+	  patch_staging partition, so the cost on a normal boot is one word read.
+
+if TINYFOTA_APPLIER
+
+config TINYFOTA_APPLIER_LOG
+	bool "Print applier progress"
+	depends on PRINTK
+	help
+	  Bench only. MCUboot in the sample is built with CONFIG_PRINTK=n and no
+	  LOG (samples/nrf52833/sysbuild/mcuboot.conf explains what that is worth), so
+	  turning this on also means turning those back on and finding the flash
+	  for them.
+
+	  Worth it exactly once: the first time a patch is applied on hardware,
+	  when the difference between "declined the patch" and "applied it and
+	  produced an image that fails validation" is otherwise invisible.
+
+config TINYFOTA_APPLIER_CHUNK
+	int "Patch read buffer, bytes"
+	default 256
+	range 64 1024
+	help
+	  How much of the staged patch is read from flash at a time before being
+	  handed to detools. Larger is marginally faster and costs BSS. detools
+	  itself is a streaming decoder and imposes no minimum.
+
+endif # TINYFOTA_APPLIER
+
+config TINYFOTA_RECEIVER
+	bool "Delta patch receiver (application side)"
+	depends on FLASH && SETTINGS
+	depends on PSA_WANT_ALG_ECDSA && PSA_WANT_ECC_SECP_R1_256
+	help
+	  Receive a signed delta patch into the patch_staging partition and
+	  reboot into the bootloader, which applies it.
+
+	  Set this ONLY on the application image. It writes to flash and checks
+	  a signature; it never patches anything, because it is executing from
+	  the slot a patch rewrites.
+
+	  Transport-independent. The Zephyr port feeds it from its own L2CAP CoC,
+	  a GATT characteristic and SMP, but nothing in the receiver knows that.
+
+	  NOTHING IS ACCEPTED until tinyfota_window_open() has been called. That
+	  window is the authorization: the patch is signed and MCUboot re-checks
+	  the result, so no peer can install code either way, but a closed
+	  channel is what stops an unauthenticated peer in radio range from
+	  burning flash cycles and forcing reboots.
+
+if TINYFOTA_RECEIVER
+
+config TINYFOTA_WINDOW_MS
+	int "How long an update window stays open, milliseconds"
+	default 300000
+	range 10000 3600000
+	help
+	  Five minutes by default: long enough to push a patch over a connection
+	  interval that the application is also using, short enough that an
+	  owner who opened it and walked away is not leaving it open all day.
+
+config TINYFOTA_BLE
+	bool "BLE transport: an L2CAP CoC and a GATT characteristic"
+	default y
+	depends on BT_PERIPHERAL && BT_L2CAP_DYNAMIC_CHANNEL
+	depends on $(dt_alias_enabled,sw0)
+	help
+	  ports/zephyr/dfu_ble_zephyr.c: the receiver's frames over a dedicated
+	  L2CAP CoC (PSM 0x0081) and over a GATT characteristic for hosts that
+	  cannot open a CoC, plus the sw0 button that opens the update window.
+
+	  Reserve a connection for updates: CONFIG_BT_MAX_CONN must leave a slot
+	  free while the application's own peer is connected, or the board stops
+	  advertising and no updater can find it. The sample enforces this at
+	  build time.
+
+config TINYFOTA_RECOVERY_GESTURE
+	bool "Long sw0 hold enters MCUboot serial recovery"
+	depends on TINYFOTA_BLE && RETENTION_BOOT_MODE
+	default y
+	help
+	  Keep the existing short runtime press as the application DFU-window
+	  gesture. Holding the same button continuously requests MCUboot through
+	  the retained boot-mode byte and warm-resets into serial recovery. This
+	  removes the unconditional serial-probe delay from every ordinary boot.
+
+config TINYFOTA_RECOVERY_HOLD_MS
+	int "MCUboot recovery hold time, milliseconds"
+	depends on TINYFOTA_RECOVERY_GESTURE
+	default 5000
+	range 2000 15000
+	help
+	  The button must still be active when this delay expires. Five seconds
+	  keeps an ordinary update-window press distinct from recovery.
+
+config TINYFOTA_SMP_IMG
+	bool "Serve SMP group 1, so stock mcumgr clients can push an update"
+	depends on MCUMGR
+	help
+	  Answer the mcumgr image-management group with the receiver above, so
+	  that nRF Device Manager, nRF Connect for iOS or the `mcumgr` CLI can
+	  upload a patch without any bespoke tooling on the other end.
+
+	  This does NOT enable Zephyr's CONFIG_MCUMGR_GRP_IMG, which cannot be
+	  built on this board at all:
+
+	    unsatisfied dependencies: IMG_MANAGER (=n),
+	                              (!MCUBOOT_BOOTLOADER_MODE_SINGLE_APP) (=n)
+
+	  img_mgmt is gated off by single-slot mode itself, and single-slot mode
+	  is what makes MCUboot fit in a 512 KB part. ports/zephyr/dfu_smp_img.c serves
+	  the same group ID instead, forwarding every byte to the same checks.
+
+	  The window gate still applies: uploads and erases are refused with
+	  ACCESS_DENIED until the owner opens an update window.
+
+	  You must also set CONFIG_MCUMGR_TRANSPORT_BT and a permission choice.
+	  Note what that costs -- MCUMGR_TRANSPORT_BT_PERM_RW hands an
+	  unpaired peer the SMP endpoint, and only the window gate stands in
+	  front of it. The native L2CAP transport needs no such setting.
+
+module = TINYFOTA
+module-str = tinyfota
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # TINYFOTA_RECEIVER
