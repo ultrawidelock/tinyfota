@@ -51,9 +51,9 @@ TEST_HDRS := $(wildcard include/tinyfota/*.h core/*.h tests/host/*.h tests/host/
 ADD_SRCS := tests/host/test.c tests/host/test_tinyfota.c \
 	tests/host/dfufake/dfufake.c tests/host/psafake/psafake.c \
 	tests/host/port/osal_host.c tests/host/port/flash_host.c \
-	core/dfu_crc.c core/dfu_receiver.c ports/zephyr/crypto_psa.c
+	core/dfu_crc.c core/dfu_receiver.c core/dfu_applier.c ports/zephyr/crypto_psa.c
 
-.PHONY: test asan seams wire tooling clean
+.PHONY: test asan seams wire tooling powercut fuzz fuzz-run clean
 
 $(BUILD)/host_test_dfu: $(TEST_SRCS) $(TEST_HDRS)
 	@mkdir -p $(@D)
@@ -111,6 +111,77 @@ seams:
 	echo "libc, not a seam: $$(grep -E '$(LIBC_RE)' $(BUILD)/seams/all.txt | tr '\n' ' ')"; \
 	diff -u tests/seams.expected $(BUILD)/seams/seams.txt && \
 	echo "make seams: $$(wc -l < $(BUILD)/seams/seams.txt | tr -d ' ') symbols, matches tests/seams.expected"
+
+# The power-cut simulator (tests/powercut/powercut.c): the real receiver and
+# applier over the vendored detools, with the bootloader's detools settings,
+# on a NOR flash model; the power is cut at every flash operation of a real
+# update between two synthetic images. Vendored code is compiled as shipped and
+# only its own warnings are silenced (-w on its objects, never on ours).
+PC := $(BUILD)/pc
+PC_FIXTURES := tests/powercut/fixtures
+PC_DEFS := $(DETOOLS_DEFS) -DTINYFOTA_PORT_LOG=1 -DCONFIG_TINYFOTA_APPLIER_LOG=1 \
+	-DCONFIG_TINYFOTA_APPLIER_CHUNK=256
+PC_SRCS := tests/powercut/powercut.c core/dfu_receiver.c core/dfu_applier.c core/dfu_crc.c
+
+$(PC)/detools.o: $(DETOOLS)/detools.c $(DETOOLS)/detools.h
+	@mkdir -p $(@D)
+	$(CC) -std=c11 -O2 -w $(DETOOLS_DEFS) $(CORE_INCS) -c $< -o $@
+
+$(PC)/heatshrink_decoder.o: $(DETOOLS)/heatshrink/heatshrink_decoder.c
+	@mkdir -p $(@D)
+	$(CC) -std=c11 -O2 -w $(DETOOLS_DEFS) $(CORE_INCS) -c $< -o $@
+
+$(BUILD)/powercut: $(PC_SRCS) $(TEST_HDRS) $(PC)/detools.o $(PC)/heatshrink_decoder.o
+	$(CC) -std=c11 -O2 $(WARN) $(PC_DEFS) $(CORE_INCS) $(PC_SRCS) \
+		$(PC)/detools.o $(PC)/heatshrink_decoder.o -o $@
+
+powercut: $(BUILD)/powercut
+	$(BUILD)/powercut $(PC_FIXTURES)/base.bin $(PC_FIXTURES)/target.bin $(PC_FIXTURES)/update.wdfu
+
+# libFuzzer targets (tests/fuzz/): the header parsers, the receiver's frame and
+# SMP upload paths, and patch application on garbage. Apple's clang ships no
+# libFuzzer; LLVM's does. On macOS with Homebrew's LLVM, whose clang finds
+# the wrong ld by default:
+#   make fuzz-run FUZZ_CC=$$(brew --prefix llvm)/bin/clang FUZZ_LDFLAGS=--ld-path=/usr/bin/ld
+# fuzz-run gives each target FUZZ_SECONDS, starting from the committed seeds
+# (tests/fuzz/gen_seeds.py) and growing its corpus under build/fuzz/; a crash
+# is saved as build/fuzz/crash-<target>-<hash> and stops that target.
+FUZZ_CC ?= clang
+FUZZ_LDFLAGS ?=
+FUZZ_SECONDS ?= 600
+FUZZ := build/fuzz
+FUZZ_TARGETS := header frame upload apply
+FUZZ_SAN := -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all
+FUZZ_DEFS := -DTINYFOTA_PORT_HOST -D_DEFAULT_SOURCE -DTINYFOTA_PORT_LOG=1 \
+	-DCONFIG_TINYFOTA_SMP_IMG=1 -DCONFIG_TINYFOTA_APPLIER_CHUNK=256 $(DETOOLS_DEFS)
+FUZZ_INCS := -Itests/fuzz -Itests/host/port $(CORE_INCS)
+FUZZ_SRCS := tests/fuzz/fuzz_port.c tests/host/port/flash_host.c tests/host/port/osal_host.c \
+	core/dfu_crc.c core/dfu_receiver.c core/dfu_applier.c
+FUZZ_VENDOR := $(FUZZ)/detools.o $(FUZZ)/heatshrink_decoder.o
+
+$(FUZZ)/detools.o: $(DETOOLS)/detools.c $(DETOOLS)/detools.h
+	@mkdir -p $(@D)
+	$(FUZZ_CC) -std=c11 -w $(FUZZ_SAN) -fsanitize=fuzzer-no-link $(DETOOLS_DEFS) $(CORE_INCS) -c $< -o $@
+
+$(FUZZ)/heatshrink_decoder.o: $(DETOOLS)/heatshrink/heatshrink_decoder.c
+	@mkdir -p $(@D)
+	$(FUZZ_CC) -std=c11 -w $(FUZZ_SAN) -fsanitize=fuzzer-no-link $(DETOOLS_DEFS) $(CORE_INCS) -c $< -o $@
+
+$(FUZZ)/fuzz_%: tests/fuzz/fuzz_%.c $(FUZZ_SRCS) $(TEST_HDRS) tests/fuzz/fuzz_port.h $(FUZZ_VENDOR)
+	$(FUZZ_CC) -std=c11 $(WARN) $(FUZZ_SAN) -fsanitize=fuzzer $(FUZZ_DEFS) $(FUZZ_INCS) \
+		$< $(FUZZ_SRCS) $(FUZZ_VENDOR) $(FUZZ_LDFLAGS) -o $@
+
+fuzz: $(addprefix $(FUZZ)/fuzz_,$(FUZZ_TARGETS))
+
+fuzz-run: fuzz
+	@for t in $(FUZZ_TARGETS); do \
+		mkdir -p $(FUZZ)/corpus-$$t; \
+		echo "fuzz_$$t: $(FUZZ_SECONDS) s"; \
+		$(FUZZ)/fuzz_$$t $(FUZZ)/corpus-$$t tests/fuzz/corpus/$$t \
+			-max_total_time=$(FUZZ_SECONDS) -timeout=10 -print_final_stats=1 \
+			-artifact_prefix=$(FUZZ)/crash-$$t- > $(FUZZ)/fuzz_$$t.log 2>&1; \
+		echo "  exit $$?: $$(grep -E '^(Done|==[0-9]+==ERROR|SUMMARY)' $(FUZZ)/fuzz_$$t.log | tail -2)"; \
+	done
 
 # The browser's copy of the update protocols against the Python tool, byte for
 # byte (tests/tooling/fota_wire_check.sh). Needs python3 and node.

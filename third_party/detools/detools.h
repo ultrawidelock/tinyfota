@@ -366,6 +366,7 @@ struct detools_apply_patch_in_place_t {
     int ongoing_step;
     size_t to_pos;
     size_t to_size;
+    size_t memory_size;
     size_t segment_size;
     size_t shift_size;
     size_t chunk_size;

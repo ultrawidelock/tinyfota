@@ -91,6 +91,11 @@ int detools_apply_patch_in_place_init(struct detools_apply_patch_in_place_t *sel
  * operation a suite has reason to script. */
 static uint8_t op_scratch[DFUFAKE_PAGE_SIZE];
 
+const uint8_t *dfufake_read_bytes(void)
+{
+	return op_scratch;
+}
+
 static int replay(struct detools_apply_patch_in_place_t *self_p)
 {
 	for (; script_done < script_count; script_done++) {

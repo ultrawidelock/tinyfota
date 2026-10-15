@@ -163,7 +163,16 @@ static int mem_write(void *arg_p, uintptr_t dst, void *src_p, size_t size)
 		}
 	}
 	if (s_w.len == 0U) {
-		s_w.addr = (uint32_t)dst;
+		/* A region that starts mid-word starts at the word instead, with
+		 * the bytes ahead of dst as 0xff: programming 0xff changes no
+		 * bit, so the flash write stays word-aligned whatever detools
+		 * asked for. (tinyfota: the nRF driver refuses an unaligned write
+		 * outright, and the power-cut simulator reached one.) */
+		size_t lead = (size_t)(dst & 3U);
+
+		s_w.addr = (uint32_t)dst - (uint32_t)lead;
+		memset(s_w.buf, 0xff, lead);
+		s_w.len = lead;
 	}
 
 	while (size > 0U) {
@@ -183,20 +192,39 @@ static int mem_write(void *arg_p, uintptr_t dst, void *src_p, size_t size)
 }
 
 /**
- * Read bytes from the primary flash area for a patch segment by flushing any buffered writes first
- * and reading from the flash area; returns -1 on failure.
+ * Read bytes from the primary flash area for a patch segment by flushing any buffered whole words
+ * first, reading from the flash area, and overlaying the partial tail still held; returns -1 on
+ * failure.
  */
 static int mem_read(void *arg_p, void *dst_p, uintptr_t src, size_t size)
 {
 	struct apply_ctx *c = arg_p;
+	uint8_t *dst = dst_p;
 
-	/* Anything still buffered has to be in flash before it can be read back. */
-	if (wbuf_flush_all(c) != 0) {
+	/*
+	 * Anything still buffered has to be readable, but NOT by padding the
+	 * partial tail out to a word. That is what this did as imported, and it
+	 * leaves the next write to start mid-word: detools reads from-data
+	 * between writes of to-data, so the padded word is followed by a write
+	 * at an unaligned address, which the nRF driver refuses -- failing the
+	 * patch with the slot already half rewritten. (tinyfota: found by the
+	 * power-cut simulator on its first, uncut run.) So whole words go to
+	 * flash and the tail stays here, and is copied over whatever the read
+	 * returned for those few bytes, which in flash are still erased.
+	 */
+	if (wbuf_flush_words(c) != 0) {
 		return -1;
 	}
 	if (tinyfota_flash_read(c->primary, (uint32_t)src, dst_p, size) != 0) {
 		DFU_LOG("r %u+%u failed\n", (unsigned)src, (unsigned)size);
 		return -1;
+	}
+	for (size_t i = 0; i < s_w.len; i++) {
+		uint32_t at = s_w.addr + (uint32_t)i;
+
+		if (at >= (uint32_t)src && at - (uint32_t)src < size) {
+			dst[at - (uint32_t)src] = s_w.buf[i];
+		}
 	}
 	return 0;
 }
@@ -266,6 +294,20 @@ static int step_set(void *arg_p, int step)
 {
 	struct apply_ctx *c = arg_p;
 	uint32_t value = (uint32_t)step;
+
+	/*
+	 * A STEP IS RECORDED ONLY ONCE EVERYTHING IT CLAIMS IS IN FLASH. The
+	 * combiner can still hold up to a buffer's worth of the segment detools
+	 * has just finished; as imported, the step went into the log first, and
+	 * a power cut between the two resumed past bytes that never landed.
+	 * Clearing the log (step 0, below) has the same hazard at the very end:
+	 * the next boot sees no step, fails the from-image check against a
+	 * finished-but-for-the-tail slot, and consumes the patch. (tinyfota:
+	 * both found by the exhaustive power-cut simulator.)
+	 */
+	if (wbuf_flush_all(c) != 0) {
+		return -1;
+	}
 
 	/*
 	 * STEP 0 IS NOT A STEP. detools calls step_set(0) to CLEAR the counter,

@@ -99,6 +99,10 @@ int dfufake_last_step_get(void);
 /** @brief How many scripted operations the callbacks accepted before stopping. */
 size_t dfufake_ops_done(void);
 
+/** @brief The bytes the last DFUFAKE_OP_READ returned, valid until the next
+ * scripted WRITE or READ. (tinyfota: added for the applier's read-back checks.) */
+const uint8_t *dfufake_read_bytes(void);
+
 /** Returned by the double when an applier callback refused an operation. */
 #define DFUFAKE_DETOOLS_CALLBACK_FAILED (-6001)
 

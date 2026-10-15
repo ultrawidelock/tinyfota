@@ -1816,7 +1816,13 @@ static int in_place_process_init(struct detools_apply_patch_in_place_t *self_p)
         return (-DETOOLS_CORRUPT_PATCH);
     }
 
+    /* tinyfota: from upstream PR eerimoq/detools#20. */
+    if (segment_size <= 0) {
+        return (-DETOOLS_CORRUPT_PATCH);
+    }
+
     self_p->to_pos = 0;
+    self_p->memory_size = (size_t)memory_size;
     self_p->segment_size = (size_t)segment_size;
     self_p->shift_size = (size_t)shift_size;
     self_p->to_size = (size_t)to_size;
@@ -1891,6 +1897,23 @@ static int in_place_process_size(struct detools_apply_patch_in_place_t *self_p,
     return (0);
 }
 
+/*
+ * Returns true if given number of bytes at given from offset are all
+ * within the memory. The from offset comes from the patch, so it must
+ * be checked before it is used.
+ *
+ * tinyfota: from upstream PR eerimoq/detools#21, as are its two callers'
+ * checks below.
+ */
+static bool in_place_is_from_range_valid(
+    struct detools_apply_patch_in_place_t *self_p,
+    size_t offset,
+    size_t size)
+{
+    return ((offset <= self_p->memory_size)
+            && (size <= (self_p->memory_size - offset)));
+}
+
 static int in_place_process_data(struct detools_apply_patch_in_place_t *self_p,
                                  enum detools_apply_patch_state_t next_state)
 {
@@ -1917,6 +1940,12 @@ static int in_place_process_data(struct detools_apply_patch_in_place_t *self_p,
     }
 
     if (next_state == detools_apply_patch_state_extra_size_t) {
+        if (!in_place_is_from_range_valid(self_p,
+                                          (size_t)self_p->segment.from_offset,
+                                          to_size)) {
+            return (-DETOOLS_CORRUPT_PATCH);
+        }
+
         res = in_place_mem_read(self_p,
                                 &from[0],
                                 (size_t)self_p->segment.from_offset,
@@ -1973,6 +2002,7 @@ static int in_place_process_adjustment(struct detools_apply_patch_in_place_t *se
 {
     int res;
     int offset;
+    size_t from_offset;
 
     res = patch_reader_unpack_size(&self_p->patch_reader, &offset);
 
@@ -1987,7 +2017,15 @@ static int in_place_process_adjustment(struct detools_apply_patch_in_place_t *se
         res = in_place_next_step(self_p);
         self_p->state = detools_apply_patch_state_dfpatch_size_t;
     } else {
-        self_p->segment.from_offset += offset;
+        /* Unsigned, so it cannot overflow, and a negative result wraps
+           to a large value that is rejected as well. */
+        from_offset = ((size_t)self_p->segment.from_offset + (size_t)offset);
+
+        if (!in_place_is_from_range_valid(self_p, from_offset, 0)) {
+            return (-DETOOLS_CORRUPT_PATCH);
+        }
+
+        self_p->segment.from_offset = (int)from_offset;
         self_p->state = detools_apply_patch_state_diff_size_t;
     }
 
