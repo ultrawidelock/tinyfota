@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: ISC */
+
+/* The recovery gesture (CONFIG_TINYFOTA_RECOVERY_GESTURE): the application
+ * writes a one-shot request into GPREGRET2 and warm-resets; MCUboot reads the
+ * same byte (sysbuild/mcuboot.overlay) and enters serial recovery. GPREGRET2
+ * survives a warm reset and avoids the Nordic-owned GPREGRET1. */
+/ {
+	chosen {
+		zephyr,boot-mode = &mcuboot_recovery_mode;
+	};
+};
+
+&gpregret2 {
+	mcuboot_recovery_mode: retention@0 {
+		compatible = "zephyr,retention";
+		status = "okay";
+		reg = <0x0 0x1>;
+	};
+};

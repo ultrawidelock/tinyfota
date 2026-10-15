@@ -71,12 +71,31 @@ if(CONFIG_TINYFOTA_RECEIVER)
   # finds nothing and reports a missing key that was in fact passed.
   zephyr_get(TINYFOTA_KEY)
 
+  # UNLESS ONE IS PASSED, THE KEY THIS IMAGE IS SIGNED WITH. sysbuild hands
+  # SB_CONFIG_BOOT_SIGNATURE_KEY_FILE to the application image as
+  # CONFIG_MCUBOOT_SIGNATURE_KEY_FILE (zephyr/share/sysbuild/image_configurations/
+  # MAIN_image_default.cmake), and that is visible here even though the
+  # SB_CONFIG_ symbol is not. Same key, by construction.
+  if(NOT TINYFOTA_KEY AND IS_ABSOLUTE "${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}")
+    set(TINYFOTA_KEY "${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}")
+  endif()
+
   if(NOT TINYFOTA_KEY)
     message(FATAL_ERROR
       "CONFIG_TINYFOTA_RECEIVER is set but TINYFOTA_KEY is not.\n"
       "  The receiver verifies a staged update against the public half of the\n"
       "  image-signing key, so it cannot be built without knowing which key.\n"
-      "  Pass -DTINYFOTA_KEY=<absolute path to the signing key>.")
+      "  Build with sysbuild and MCUboot, or pass\n"
+      "  -DTINYFOTA_KEY=<absolute path to the signing key>.")
+  endif()
+  # MCUboot's published development keys. Every stock MCUboot accepts images
+  # signed with them, so anyone can sign a patch this board will stage.
+  get_filename_component(tinyfota_key_name "${TINYFOTA_KEY}" NAME)
+  if(tinyfota_key_name MATCHES "^root-(ec-p256|ed25519|rsa-2048|rsa-3072)\\.pem$")
+    message(WARNING
+      "tinyfota: updates are signed with MCUboot's published development key\n"
+      "  (${TINYFOTA_KEY}). Anyone can sign a patch this board accepts. Fine on a\n"
+      "  bench; set SB_CONFIG_BOOT_SIGNATURE_KEY_FILE to your own key before shipping.")
   endif()
   if(NOT EXISTS "${TINYFOTA_KEY}")
     message(FATAL_ERROR "TINYFOTA_KEY does not exist: ${TINYFOTA_KEY}")

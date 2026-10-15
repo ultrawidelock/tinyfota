@@ -1,0 +1,143 @@
+# nRF52833 flash map for the tinyfota sample, pinned. Both boards
+# (nrf52833dk/nrf52833, decawave_dwm3001cdk) have the same 512 KB part and use
+# this one file. The layout is the source project's (ultrawidelock@d6e23761,
+# apps/dwm3001cdk-lock/pm_static.yml), unchanged.
+#
+# ---------------------------------------------------------------------------
+#  0x00000  mcuboot            40,960 B   bootloader + the tinyfota applier
+#  0x0a000  mcuboot_pad           512 B   image header
+#  0x0a200  app               433,664 B   the application
+#  0x74000  patch_staging      32,768 B   one delta patch and its control pages
+#  0x7c000  settings_storage   16,384 B   four NVS sectors
+#  0x80000  end                           40,960 + 512 + 433,664 + 32,768 +
+#                                         16,384 = 524,288, the part exactly
+# ---------------------------------------------------------------------------
+#
+# WHY PIN IT. Partition Manager derives a perfectly good map on its own, but the
+# derived map is only stable as long as every input to it is. A delta update
+# cannot move a partition: the bootloader, the application and the staging area
+# must agree on these addresses across every release in the field, and a map
+# that drifted because MCUboot grew by a sector would strand every board built
+# against the old one. So it is pinned, and an image that outgrows its partition
+# fails `west build` rather than shipping.
+#
+# WHY 0xA000 FOR MCUBOOT. The delta applier has to live in the bootloader,
+# because an application cannot rewrite the flash it is executing from. In
+# ultrawidelock it measured 3,176 B, and 0x8000 would have left 212 B free -- a
+# bootloader one commit from overflowing, in the one image that has to still
+# work when the application does not. The README's size table has the number
+# re-measured for this sample.
+#
+# WHY ONE SLOT. Two full slots of ultrawidelock's image wanted 844 KB of a
+# 512 KB part, and there is no external flash to stage into. What fits beside
+# the running image is a delta.
+#
+# HOW TO CHECK THIS FILE IS STILL TRUE
+#   west build -d <build> -t partition_manager_report
+
+mcuboot:
+  address: 0x0
+  end_address: 0xa000
+  region: flash_primary
+  size: 0xa000
+  placement:
+    align:
+      end: 0x1000
+    before:
+      - mcuboot_primary
+
+mcuboot_pad:
+  address: 0xa000
+  end_address: 0xa200
+  region: flash_primary
+  size: 0x200
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - mcuboot_primary_app
+
+# `app` is the application's own payload region: what the linker sizes the image
+# against, and what mcuboot_primary_app spans. It starts after the pad because
+# the pad is where MCUboot writes the image header.
+app:
+  address: 0xa200
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x69e00
+
+mcuboot_primary_app:
+  address: 0xa200
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x69e00
+  orig_span: &id002
+    - app
+  span: *id002
+
+# The slot MCUboot validates and boots: the header plus the payload, and the
+# memory the patch rewrites in place. detools needs forward-shift slack INSIDE
+# this slot (two 4,096 B segments by default), so the larger of the two images
+# a patch connects must leave at least that much of it free.
+#
+# The application signs with --max-sectors 1 (prj.conf), because in
+# single-slot mode MCUboot's own trailer does not depend on the sector count:
+# imgtool would otherwise reserve swap-status space that single-slot never uses
+# (1,524 B of it in ultrawidelock). These signing commands do not use --pad,
+# so max-sectors changes only imgtool's overflow check; it does not add, remove
+# or move bytes in the signed image.
+mcuboot_primary:
+  address: 0xa000
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x6a000
+  orig_span: &id001
+    - app
+    - mcuboot_pad
+  span: *id001
+
+# Where an update lands. The application writes a received delta patch here and
+# reboots; MCUboot applies it onto mcuboot_primary and then erases this
+# partition. Nothing else may be stored here, and nothing here survives an
+# update. FORMAT.md has the layout: page 0 the header, page 1 detools' step
+# log, page 2 onward the patch.
+#
+# 32,768 B, so 24,576 B of patch after the two control pages. Patch size is
+# driven by how far code SHIFTS, not by how much of it changed. Measured in
+# ultrawidelock:
+#
+#   build timestamp only, no code change      7,632 B
+#   fifty-two bytes of new code              17,335 B
+#
+# GROWING IT IS EXPENSIVE. A partition move is a flash map change, and a flash
+# map change is the one thing an over-the-air update cannot deliver: it needs a
+# cable on every board that already exists. Decide it early or not at all.
+patch_staging:
+  address: 0x74000
+  end_address: 0x7c000
+  region: flash_primary
+  size: 0x8000
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - settings_storage
+
+# Settings. `west flash` without --erase keeps it across a reflash; merged.hex
+# stops short of it.
+settings_storage:
+  address: 0x7c000
+  end_address: 0x80000
+  region: flash_primary
+  size: 0x4000
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - end
+
+sram_primary:
+  address: 0x20000000
+  end_address: 0x20020000
+  region: sram_primary
+  size: 0x20000

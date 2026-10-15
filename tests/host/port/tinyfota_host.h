@@ -14,8 +14,11 @@
 
 /* ---- flash (flash_host.c) -------------------------------------------------
  *
- * Geometry matches the source project's DWM3001CDK partition map, so
- * size-limit checks in the code under test are the ones it met on that board.
+ * The values the source suite was written against. The primary slot matches
+ * the partition map (samples/nrf52833/pm_static.yml, 0x6a000). Staging does
+ * not: the map's patch_staging is 0x8000, and these 0xa000 bytes are the size
+ * it had before the source project shrank it (its commit 50e762d5). Kept, because the imported
+ * suite's size-limit cases are written against it.
  */
 #define TINYFOTA_FLASH_HOST_WRITE_BLOCK  4u
 #define TINYFOTA_FLASH_HOST_PAGE_SIZE    4096u

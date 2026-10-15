@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: ISC */
+
+/* The application (boards/*.overlay) and MCUboot must name the same retained
+ * GPREGRET2 byte. Both boards in this sample have it. */
+/ {
+	chosen {
+		zephyr,boot-mode = &mcuboot_recovery_mode;
+	};
+};
+
+&gpregret2 {
+	mcuboot_recovery_mode: retention@0 {
+		compatible = "zephyr,retention";
+		status = "okay";
+		reg = <0x0 0x1>;
+	};
+};
