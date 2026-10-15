@@ -1,5 +1,3 @@
-<!-- DISCLAIMER: maintainer adds this -->
-
 # tinyfota
 
 Firmware updates over Bluetooth for chips too small to hold two copies of
@@ -10,6 +8,11 @@ Extracted from ultrawidelock@d6e23761.
 **Status:** passes every host test (unit, sanitizers, power-cut, fuzz) and
 builds on upstream Zephyr v4.4.2 and NCS v3.3.0. Not yet run on a board; the
 source project proved the browser path on hardware.
+
+**Disclaimer:** experimental software, provided as is with no warranty of any
+kind (`LICENSE`). Test every update path on your own boards before you ship it.
+Not affiliated with or endorsed by Nordic Semiconductor, the Zephyr Project or
+MCUboot; their names here only say what tinyfota works with.
 
 ## How it works
 
