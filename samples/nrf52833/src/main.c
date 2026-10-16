@@ -3,10 +3,11 @@
 /*
  * tinyfota sample: the smallest application that takes a delta update.
  *
- * It advertises the two services an updater looks for, keeps a connection slot
+ * It advertises the services an updater looks for, keeps a connection slot
  * free for one, opens an update window when sw0 is pressed, and says at every
  * boot which image it is running. Everything else is the tinyfota module:
- * ports/zephyr/dfu_ble_zephyr.c (L2CAP CoC, GATT, the button), and
+ * ports/zephyr/dfu_ble_zephyr.c (the button, and with native.conf the L2CAP
+ * CoC and the native GATT service), and
  * ports/zephyr/dfu_smp_img.c (SMP over Bluetooth and uart0).
  *
  * No update is accepted until the window is open. The patch is signed and
@@ -45,7 +46,8 @@ BUILD_ASSERT(CONFIG_BT_MAX_CONN >= 2,
  * FOUND BY SERVICE UUID, never by name. A 31-byte advertisement truncates the
  * name, and a name filter then fails silently (ultrawidelock commit 6001dd51).
  * The SMP service goes in the advertisement, the native update service in the
- * scan response; every tinyfota host tool filters on one or the other.
+ * scan response when native.conf builds it in; every tinyfota host tool
+ * filters on one or the other.
  */
 static const struct bt_data k_ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -54,8 +56,10 @@ static const struct bt_data k_ad[] = {
 };
 
 static const struct bt_data k_sd[] = {
+#if IS_ENABLED(CONFIG_TINYFOTA_BLE_GATT) || IS_ENABLED(CONFIG_TINYFOTA_BLE_COC)
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL,
 		      BT_UUID_128_ENCODE(0xd3b5a140, 0x9e23, 0x4b3a, 0x8be4, 0x6b1ee5f980a3)),
+#endif
 	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 

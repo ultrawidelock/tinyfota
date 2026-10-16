@@ -103,24 +103,61 @@ config TINYFOTA_CLAIM_IDLE_MS
 	  is ample for the signed preamble and for a connection-parameter update
 	  mid-transfer.
 
-config TINYFOTA_BLE
-	bool "BLE transport: an L2CAP CoC and a GATT characteristic"
+config TINYFOTA_BLE_SMP
+	bool "BLE transport: SMP over GATT, what the shipped clients speak"
 	default y
-	depends on BT_PERIPHERAL && BT_L2CAP_DYNAMIC_CHANNEL
-	depends on $(dt_alias_enabled,sw0)
+	depends on MCUMGR && MCUMGR_TRANSPORT_BT
+	select TINYFOTA_SMP_IMG
 	help
-	  ports/zephyr/dfu_ble_zephyr.c: the receiver's frames over a dedicated
-	  L2CAP CoC (PSM 0x0081) and over a GATT characteristic for hosts that
-	  cannot open a CoC, plus the sw0 button that opens the update window.
+	  The update path every shipped client uses: `tinyfota push`
+	  (tools/tinyfota/tinyfota/smp.py), the browser page (web/index.html
+	  loads fota.js on smp.js) and nRF Device Manager all speak mcumgr's
+	  SMP over GATT. This serves image group 1 on it (TINYFOTA_SMP_IMG
+	  below). It needs neither BT_L2CAP_DYNAMIC_CHANNEL nor BT_SMP.
 
 	  Reserve a connection for updates: CONFIG_BT_MAX_CONN must leave a slot
 	  free while the application's own peer is connected, or the board stops
 	  advertising and no updater can find it. The sample enforces this at
 	  build time.
 
+config TINYFOTA_BLE_GATT
+	bool "BLE transport: the native GATT service (d3b5a140)"
+	depends on BT_PERIPHERAL
+	help
+	  ports/zephyr/dfu_ble_zephyr.c: the receiver's own frames (FORMAT.md)
+	  over a GATT characteristic (service d3b5a140, characteristic
+	  d3b5a141), for hosts that cannot open a CoC. web/wdfu.js speaks it,
+	  but no shipped page imports wdfu.js and `tinyfota push` is SMP only,
+	  so it is off by default.
+
+config TINYFOTA_BLE_COC
+	bool "BLE transport: the native L2CAP CoC (PSM 0x0081)"
+	depends on BT_PERIPHERAL && BT_L2CAP_DYNAMIC_CHANNEL
+	help
+	  ports/zephyr/dfu_ble_zephyr.c: the receiver's own frames over a
+	  dedicated L2CAP CoC (PSM 0x0081, 256 B SDUs). No shipped client opens
+	  it, so it is off by default. The only transport here that needs
+	  BT_L2CAP_DYNAMIC_CHANNEL, which in Zephyr also needs BT_SMP.
+
+config TINYFOTA_BUTTON
+	bool "sw0 opens the update window"
+	default y
+	depends on GPIO && $(dt_alias_enabled,sw0)
+	help
+	  ports/zephyr/dfu_ble_zephyr.c: a press of the sw0 button opens an
+	  update window, armed by tinyfota_ble_start(). An application that
+	  uses sw0 itself turns this off and calls tinyfota_window_open() from
+	  its own gesture instead.
+
+# Not a choice: compiles ports/zephyr/dfu_ble_zephyr.c, which holds the native
+# transports and the button, and declares tinyfota_ble_start().
+config TINYFOTA_BLE
+	bool
+	default y if TINYFOTA_BLE_GATT || TINYFOTA_BLE_COC || TINYFOTA_BUTTON
+
 config TINYFOTA_RECOVERY_GESTURE
 	bool "Long sw0 hold enters MCUboot serial recovery"
-	depends on TINYFOTA_BLE && RETENTION_BOOT_MODE
+	depends on TINYFOTA_BUTTON && RETENTION_BOOT_MODE
 	default y
 	help
 	  Keep the existing short runtime press as the application DFU-window
@@ -157,6 +194,9 @@ config TINYFOTA_SMP_IMG
 
 	  The window gate still applies: uploads and erases are refused with
 	  ACCESS_DENIED until the owner opens an update window.
+
+	  TINYFOTA_BLE_SMP above selects this for SMP over Bluetooth; set it
+	  alone for SMP over another transport (uart0 in the sample).
 
 	  You must also set CONFIG_MCUMGR_TRANSPORT_BT and a permission choice.
 	  Note what that costs -- MCUMGR_TRANSPORT_BT_PERM_RW hands an

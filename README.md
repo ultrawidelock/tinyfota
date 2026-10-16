@@ -117,6 +117,22 @@ Measured 2026-10-16 on the nRF52833 DK.
 | Staging area                      | 32 KB, of which 24 KB update | same                        |
 | Update after changing one setting | 3,611 B, 1.91% of the image  | 3,645 B, 1.91% of the image |
 
+The Bluetooth transports are separate Kconfig symbols: `TINYFOTA_BLE_SMP`
+(SMP over GATT, what `tinyfota push`, the browser page and nRF Device Manager
+speak), and the native `TINYFOTA_BLE_GATT` and `TINYFOTA_BLE_COC`, which no
+shipped client uses and which are off by default. The sample builds SMP only;
+`-DEXTRA_CONF_FILE=native.conf` adds the other two. Measured 2026-10-16 on the
+DWM3001CDK, NCS v3.3.0, the sample's application image:
+
+| Sample application                       | Flash     | RAM      |
+|------------------------------------------|-----------|----------|
+| SMP, native GATT and CoC (`native.conf`) | 190,508 B | 44,936 B |
+| SMP only (the default)                   | 166,916 B | 41,624 B |
+| Saved                                    | 23,592 B  | 3,312 B  |
+
+The SMP-only build also drops `BT_SMP` and `BT_L2CAP_DYNAMIC_CHANNEL`, which
+only the CoC needs.
+
 ## Proof
 
 | Test            | What it did                                                    | Result                                           |

@@ -9,12 +9,13 @@ The smallest application that takes a delta update. It builds for two boards:
 
 What it does:
 
-- advertises the SMP service, and the native update service in its scan
-  response, so every updater finds it by service UUID;
+- advertises the SMP service, so every updater finds it by service UUID (and,
+  with `native.conf`, the native update service in its scan response);
 - keeps a second connection slot free for an updater, and refuses to build
   with `CONFIG_BT_MAX_CONN` below 2;
-- receives a patch over its own L2CAP CoC, a GATT characteristic, SMP over
-  Bluetooth, or SMP over uart0;
+- receives a patch over SMP over Bluetooth or SMP over uart0, and with
+  `-DEXTRA_CONF_FILE=native.conf` also over its own L2CAP CoC and the native
+  GATT service, which no shipped client uses;
 - accepts nothing until **sw0** opens a 300 s update window, and lights
   **led0** while it is open;
 - says at every boot which image it runs (version and MCUboot SHA-256, on RTT

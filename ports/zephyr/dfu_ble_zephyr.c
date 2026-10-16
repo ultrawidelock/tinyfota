@@ -14,11 +14,13 @@
  * install code -- a closed channel just stops strangers spending erase cycles.
  */
 
+#if defined(CONFIG_TINYFOTA_BLE_GATT) || defined(CONFIG_TINYFOTA_BLE_COC)
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/bluetooth/uuid.h>
+#endif
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -31,6 +33,7 @@
 
 LOG_MODULE_DECLARE(tinyfota, CONFIG_TINYFOTA_LOG_LEVEL);
 
+#if IS_ENABLED(CONFIG_TINYFOTA_BLE_COC)
 /**
  * Its own PSM.
  *
@@ -38,7 +41,8 @@ LOG_MODULE_DECLARE(tinyfota, CONFIG_TINYFOTA_LOG_LEVEL);
  * That channel's bytes go to the application's own parser; giving it a second
  * message class to distinguish would put update framing inside it. A separate
  * PSM costs one bt_l2cap_server and keeps them apart. 0x0081 is the value the
- * existing host tools and browser page use.
+ * source project's tools used. No client shipped here opens a CoC: `tinyfota
+ * push` and the browser page (web/fota.js) speak SMP over GATT.
  */
 #define DFU_L2CAP_PSM 0x0081u
 
@@ -165,7 +169,9 @@ static struct bt_l2cap_server s_dfu_server = {
 	.sec_level = BT_SECURITY_L1,
 	.accept = dfu_accept,
 };
+#endif /* CONFIG_TINYFOTA_BLE_COC */
 
+#if IS_ENABLED(CONFIG_TINYFOTA_BLE_GATT)
 /* ---- the same frames over GATT -------------------------------------------- */
 /*
  * WHY BOTH. The CoC above is the better transport and is what an iPhone app
@@ -187,7 +193,9 @@ static struct bt_l2cap_server s_dfu_server = {
  * nothing it could not achieve by spamming any other characteristic.
  */
 
-/* The vendor UUIDs the existing host tools and browser page look for. */
+/* The vendor UUIDs web/wdfu.js looks for. No shipped page imports wdfu.js; the
+ * browser page only accepts a board that advertises this service in its scan
+ * filter (web/smp.js), then speaks SMP to it. */
 static const struct bt_uuid_128 k_dfu_svc_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0xd3b5a140, 0x9e23, 0x4b3a, 0x8be4, 0x6b1ee5f980a3));
 static const struct bt_uuid_128 k_dfu_chr_uuid = BT_UUID_INIT_128(
@@ -242,7 +250,9 @@ static void dfu_gap_disconnected(struct bt_conn *conn, uint8_t reason)
 BT_CONN_CB_DEFINE(dfu_conn_callbacks) = {
 	.disconnected = dfu_gap_disconnected,
 };
+#endif /* CONFIG_TINYFOTA_BLE_GATT */
 
+#if IS_ENABLED(CONFIG_TINYFOTA_BUTTON)
 /* ---- the trigger ---------------------------------------------------------- */
 /*
  * The sw0 button (SW2 on the DWM3001CDK), pressed while the board is running.
@@ -311,22 +321,29 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb,
 				K_MSEC(CONFIG_TINYFOTA_RECOVERY_HOLD_MS));
 #endif
 }
+#endif /* CONFIG_TINYFOTA_BUTTON */
 
 /**
- * Initialize the DFU update channel. Registers the L2CAP server, configures the optional button for
+ * Initialize the DFU update channel. Registers the L2CAP server (CONFIG_TINYFOTA_BLE_COC),
+ * configures the optional button (CONFIG_TINYFOTA_BUTTON) for
  * software window control if available, and logs readiness or warnings if the button is not ready.
  * Returns 0 on success or if button config fails gracefully (software-only mode), negative on L2CAP
  * server registration failure.
  */
 int tinyfota_ble_start(void)
 {
-	int rc = bt_l2cap_server_register(&s_dfu_server);
+	int rc = 0;
 
+#if IS_ENABLED(CONFIG_TINYFOTA_BLE_COC)
+	rc = bt_l2cap_server_register(&s_dfu_server);
 	if (rc != 0) {
 		LOG_ERR("update PSM 0x%04x register rc=%d", DFU_L2CAP_PSM, rc);
 		return rc;
 	}
+	LOG_INF("update channel ready on PSM 0x%04x", DFU_L2CAP_PSM);
+#endif
 
+#if IS_ENABLED(CONFIG_TINYFOTA_BUTTON)
 	if (!gpio_is_ready_dt(&s_button)) {
 		LOG_WRN("no update button; the window can only be opened in software");
 		return 0;
@@ -344,11 +361,12 @@ int tinyfota_ble_start(void)
 	gpio_init_callback(&s_button_cb, button_pressed, BIT(s_button.pin));
 	(void)gpio_add_callback(s_button.port, &s_button_cb);
 
-	LOG_INF("update channel ready on PSM 0x%04x, press sw0 to open a window",
-		DFU_L2CAP_PSM);
+	LOG_INF("press sw0 to open an update window");
 #if IS_ENABLED(CONFIG_TINYFOTA_RECOVERY_GESTURE)
 	LOG_INF("hold sw0 for %u ms to enter MCUboot recovery",
 		(unsigned int)CONFIG_TINYFOTA_RECOVERY_HOLD_MS);
 #endif
+#endif /* CONFIG_TINYFOTA_BUTTON */
+	ARG_UNUSED(rc);
 	return 0;
 }

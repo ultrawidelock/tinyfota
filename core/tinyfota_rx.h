@@ -184,8 +184,9 @@ int tinyfota_rx_erase(enum tinyfota_owner owner);
 
 #ifdef CONFIG_TINYFOTA_BLE
 /**
- * Start the BLE transport (ports/zephyr/dfu_ble_zephyr.c): register the
- * update PSM and arm the sw0 button. Call once, after bt_enable().
+ * Start the Zephyr port's own triggers (ports/zephyr/dfu_ble_zephyr.c):
+ * register the update PSM (CONFIG_TINYFOTA_BLE_COC) and arm the sw0 button
+ * (CONFIG_TINYFOTA_BUTTON). Call once, after bt_enable().
  *
  * @retval 0 on success, or with no usable button (software-only window)
  * @retval negative when the L2CAP server cannot be registered
