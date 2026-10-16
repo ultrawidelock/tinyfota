@@ -222,6 +222,21 @@ config TINYFOTA_SMP_IMG
 	  unpaired peer the SMP endpoint, and only the window gate stands in
 	  front of it. The native L2CAP transport needs no such setting.
 
+# A second definition of a Zephyr symbol, so that a single-slot build is free
+# of Kconfig warnings. MCUboot's sysbuild module assigns
+# CONFIG_MCUBOOT_UPDATE_FOOTER_SIZE to every application it boots
+# (bootloader/mcuboot/boot/zephyr/sysbuild/CMakeLists.txt), with no opt-out
+# outside the nRF54H20, but Zephyr gives the symbol a prompt only under
+# MCUBOOT_IMG_MANAGER (subsys/dfu/Kconfig), which a single-slot image cannot
+# build: bootutil_public.c needs a secondary slot. This prompt lets the
+# assignment land instead of warning. Nothing reads the value here: its only
+# user, MCUMGR_GRP_IMG_TOO_LARGE_SYSBUILD, needs MCUMGR_GRP_IMG, which
+# single-slot mode refuses (TINYFOTA_SMP_IMG above).
+config MCUBOOT_UPDATE_FOOTER_SIZE
+	hex "Estimated update footer size, assigned by sysbuild and unused"
+	depends on MCUBOOT_BOOTLOADER_MODE_SINGLE_APP
+	default 0x0
+
 module = TINYFOTA
 module-str = tinyfota
 source "subsys/logging/Kconfig.template.log_config"

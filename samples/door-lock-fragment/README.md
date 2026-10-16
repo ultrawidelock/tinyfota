@@ -8,10 +8,15 @@ reference these lines are cut from, and its files say why each line is there.
 
 | File here | Goes to, in the application | What it is |
 |---|---|---|
-| `tinyfota.conf` | a Kconfig fragment in `CONF_FILE` (for example `stacks/tinyfota.conf`) | the receiver, SMP over Bluetooth, the reset gate |
-| `sysbuild.conf` | `sysbuild.conf` | MCUboot, single slot, ECDSA P-256 |
-| `sysbuild/mcuboot.conf` | `sysbuild/mcuboot.conf` | `BOOT_VALIDATE_SLOT0`, the applier, size trims |
-| `pm_static.yml` | `pm_static.yml` | the four partitions; `make tooling` checks it against the sample's |
+| `tinyfota.conf` | `stacks/tinyfota.conf`, last in `CONF_FILE` | the receiver, SMP over Bluetooth, the reset gate |
+| `sysbuild.conf` | `stacks/tinyfota/sysbuild.conf`, as `SB_CONF_FILE` | MCUboot, single slot, ECDSA P-256 |
+| `mcuboot.conf` | `stacks/tinyfota/mcuboot.conf`, as `mcuboot_CONF_FILE` | MCUboot's whole configuration: `BOOT_VALIDATE_SLOT0`, the applier, size trims |
+| `pm_static.yml` | `stacks/tinyfota/pm_static.yml`, as `PM_STATIC_YML_FILE` | the four partitions; `make tooling` checks it against the sample's |
+
+`mcuboot.conf` REPLACES MCUboot's own `prj.conf` and board fragment rather
+than extending them; its header says why. Pass it as `mcuboot_CONF_FILE`
+with an absolute path, and do not put it at `<app>/sysbuild/mcuboot.conf`,
+where sysbuild would also merge it as an extra fragment.
 
 ## Build
 
@@ -20,20 +25,31 @@ From the root of an NCS v3.3.0 workspace:
 ```
 west build -p always -b decawave_dwm3001cdk --sysbuild -d <build> <app> -- \
   -DZEPHYR_EXTRA_MODULES="<other modules>;<tinyfota>" \
-  -DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=<absolute path to the signing key>
+  -DCONF_FILE="prj.conf;<the application's stacks>;stacks/tinyfota.conf" \
+  -DSB_CONF_FILE=stacks/tinyfota/sysbuild.conf \
+  -DPM_STATIC_YML_FILE=stacks/tinyfota/pm_static.yml \
+  -Dmcuboot_CONF_FILE=<absolute path to app>/stacks/tinyfota/mcuboot.conf \
+  '-DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE="<absolute path to the signing key>"'
 ```
 
 - `--sysbuild` builds MCUboot. `ZEPHYR_EXTRA_MODULES` on the command line
-  reaches the MCUboot image too, which is how the applier gets in; nothing
-  else needs passing.
-- The signing key goes on the command line only, never in a file. Without
-  it the build signs with MCUboot's published development key and warns.
-  The receiver checks patches against the same key.
-- Without copying the files, the same build takes them from here:
-  `-DSB_CONF_FILE=<this dir>/sysbuild.conf`,
-  `-Dmcuboot_EXTRA_CONF_FILE=<this dir>/sysbuild/mcuboot.conf`,
-  `-DPM_STATIC_YML_FILE=<this dir>/pm_static.yml`, and `tinyfota.conf` added
-  to `CONF_FILE`.
+  reaches the MCUboot image too, which is how the applier gets in.
+- The signing key goes on the command line only, never in a file, and its
+  value keeps the inner double quotes: sysbuild reads it as a Kconfig string
+  and stops with "malformed string literal" without them. Without the flag
+  the build signs with MCUboot's published development key and warns. The
+  receiver checks patches against the same key.
+- The build prints no "was assigned" Kconfig warning. What it still prints:
+  four `Deprecated symbol PARTITION_MANAGER(_ENABLED) is enabled` lines, which
+  NCS v3.3.0 prints for every build that uses Partition Manager, and therefore
+  `pm_static.yml`; CMake warnings for the development key and NCS's
+  secure-boot and Partition Manager notices.
+- Two warnings are fixed outside these files. `sysbuild.conf` turns off
+  `SB_CONFIG_MCUBOOT_APP_SYNC_UPDATEABLE_IMAGES`, so sysbuild stops assigning
+  `CONFIG_UPDATEABLE_IMAGE_NUMBER` to an application that has no image
+  manager. `zephyr/Kconfig` gives `MCUBOOT_UPDATE_FOOTER_SIZE` a prompt in a
+  single-slot receiver build, so the value MCUboot's sysbuild module assigns
+  to every application lands; its comment says why there is no other way.
 
 ## What the application does
 
@@ -52,23 +68,27 @@ partition (`FORMAT.md`); `settings_storage` is untouched.
 
 ## Board gate: five commands
 
-From the root of an NCS v3.3.0 workspace, with `tinyfota.conf` copied to
-`<app>/stacks/tinyfota.conf` and the other three files to `<app>`, and
-`tinyfota` installed (`pip install ./tools/tinyfota`). `<key>` is the absolute
-path to the signing key, the same in every command.
+From the root of an NCS v3.3.0 workspace, with the four files at the paths in
+the table above, and `tinyfota` installed (`pip install ./tools/tinyfota`).
+`<key>` is the absolute path to the signing key, the same in every command,
+and `<app>` is absolute.
 
 ```
 # 1. the base image, built and flashed; keep this build directory
 west build -p always -b decawave_dwm3001cdk --sysbuild -d <build>/fota-v1 <app> -- \
   -DZEPHYR_EXTRA_MODULES="<tinytalk>;<tinyfota>" \
   -DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/nrf-security.conf;stacks/tinyfota.conf" \
-  -DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=<key> && west flash -d <build>/fota-v1
+  -DSB_CONF_FILE=stacks/tinyfota/sysbuild.conf -DPM_STATIC_YML_FILE=stacks/tinyfota/pm_static.yml \
+  -Dmcuboot_CONF_FILE=<app>/stacks/tinyfota/mcuboot.conf \
+  '-DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE="<key>"' && west flash -d <build>/fota-v1
 
 # 2. the changed image: the same line with one setting changed, the image version
 west build -p always -b decawave_dwm3001cdk --sysbuild -d <build>/fota-v2 <app> -- \
   -DZEPHYR_EXTRA_MODULES="<tinytalk>;<tinyfota>" \
   -DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/nrf-security.conf;stacks/tinyfota.conf" \
-  -DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=<key> '-DCONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION="1.0.1+0"'
+  -DSB_CONF_FILE=stacks/tinyfota/sysbuild.conf -DPM_STATIC_YML_FILE=stacks/tinyfota/pm_static.yml \
+  -Dmcuboot_CONF_FILE=<app>/stacks/tinyfota/mcuboot.conf \
+  '-DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE="<key>"' '-DCONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION="1.0.1+0"'
 
 # 3. the delta; `info` prints the line to record (abi, patch bytes, file bytes)
 tinyfota build --from <build>/fota-v1/door-lock/zephyr/zephyr.signed.hex \
@@ -99,7 +119,7 @@ the 24,576 B patch capacity. Steps 4 and 5 are not yet run on a board.
 Not in the fragment. To reach MCUboot recovery over SMP, without a button, add
 to the application `CONFIG_RETAINED_MEM=y`, `CONFIG_RETENTION=y`,
 `CONFIG_RETENTION_BOOT_MODE=y` and `CONFIG_MCUMGR_GRP_OS_RESET_BOOT_MODE=y`;
-to `sysbuild/mcuboot.conf` the `MCUBOOT_SERIAL`, `BOOT_SERIAL_UART`,
+to `mcuboot.conf` the `MCUBOOT_SERIAL`, `BOOT_SERIAL_UART`,
 `UART_CONSOLE=n`, `BOOT_SERIAL_NO_APPLICATION`, retention and
 `BOOT_SERIAL_BOOT_MODE` lines of `samples/nrf52833/sysbuild/mcuboot.conf`;
 and to both images the GPREGRET2 retention node of
@@ -116,4 +136,10 @@ its stock stacks, tinytalk 9604083:
 | Application, no MCUboot, no tinyfota | 298,956 B | 97,248 B |
 | Application with `tinyfota.conf` | 308,064 B of 433,664 B | 101,216 B |
 | Added by tinyfota and mcumgr | 9,108 B | 3,968 B |
-| MCUboot with `sysbuild/mcuboot.conf` | 25,512 B of 40,960 B | 14,464 B |
+| MCUboot with `mcuboot.conf` | 25,512 B of 40,960 B | 14,464 B |
+
+Re-measured 2026-10-17 on a snapshot of tinylock 46a7115 with the layout and
+command above: application 307,652 B / 101,216 B, MCUboot 25,512 B /
+14,464 B, 0 "was assigned" warnings. MCUboot's generated `.config` is
+identical to the one built by merging this file on top of MCUboot's
+`prj.conf`.
