@@ -12,7 +12,9 @@ What it does:
 - advertises the SMP service, so every updater finds it by service UUID (and,
   with `native.conf`, the native update service in its scan response);
 - keeps a second connection slot free for an updater, and refuses to build
-  with `CONFIG_BT_MAX_CONN` below 2;
+  with `CONFIG_BT_MAX_CONN` below 2, because it stands for an application
+  whose own peer stays connected. One slot is enough when updates and the
+  application's own BLE use never overlap (`zephyr/Kconfig`, `TINYFOTA_BLE_SMP`);
 - receives a patch over SMP over Bluetooth or SMP over uart0, and with
   `-DEXTRA_CONF_FILE=native.conf` also over its own L2CAP CoC and the native
   GATT service, which no shipped client uses;
@@ -23,6 +25,12 @@ What it does:
   Single-slot MCUboot has no test state to confirm out of: MCUboot validated the
   image before jumping to it;
 - holding sw0 for 5 s reboots into MCUboot serial recovery.
+
+The button (`CONFIG_TINYFOTA_BUTTON`) and the recovery gesture
+(`CONFIG_TINYFOTA_RECOVERY_GESTURE`) default to n in the module, because sw0
+normally belongs to the application, and are turned on in `prj.conf`. An
+application that owns sw0 opens the window with `tinyfota_window_open()` and
+reaches MCUboot recovery over SMP instead (`zephyr/Kconfig`, the gesture's help).
 
 MCUboot runs single-slot with serial recovery on uart0, `BOOT_VALIDATE_SLOT0`,
 and tinyfota's applier. `sysbuild/mcuboot.conf` says why each line is there.

@@ -120,6 +120,14 @@ config TINYFOTA_BLE_SMP
 	  advertising and no updater can find it. The sample enforces this at
 	  build time.
 
+	  One slot is enough when an update and the application's own BLE use
+	  never overlap, for example a lock that uses BLE only to be
+	  commissioned: the application advertises the SMP service while the
+	  update window is open and its own link is down. With one slot no
+	  second BLE peer can connect to contest the receiver's claim
+	  (core/dfu_receiver.c, the CONFIG_BT_MAX_CONN note before the claim
+	  check).
+
 config TINYFOTA_BLE_GATT
 	bool "BLE transport: the native GATT service (d3b5a140)"
 	depends on BT_PERIPHERAL
@@ -141,13 +149,13 @@ config TINYFOTA_BLE_COC
 
 config TINYFOTA_BUTTON
 	bool "sw0 opens the update window"
-	default y
 	depends on GPIO && $(dt_alias_enabled,sw0)
 	help
 	  ports/zephyr/dfu_ble_zephyr.c: a press of the sw0 button opens an
-	  update window, armed by tinyfota_ble_start(). An application that
-	  uses sw0 itself turns this off and calls tinyfota_window_open() from
-	  its own gesture instead.
+	  update window, armed by tinyfota_ble_start(). Off by default because
+	  sw0 belongs to the application; the sample turns it on in prj.conf.
+	  An application that uses sw0 itself leaves this off and calls
+	  tinyfota_window_open() from its own gesture instead.
 
 # Not a choice: compiles ports/zephyr/dfu_ble_zephyr.c, which holds the native
 # transports and the button, and declares tinyfota_ble_start().
@@ -158,12 +166,23 @@ config TINYFOTA_BLE
 config TINYFOTA_RECOVERY_GESTURE
 	bool "Long sw0 hold enters MCUboot serial recovery"
 	depends on TINYFOTA_BUTTON && RETENTION_BOOT_MODE
-	default y
 	help
 	  Keep the existing short runtime press as the application DFU-window
 	  gesture. Holding the same button continuously requests MCUboot through
 	  the retained boot-mode byte and warm-resets into serial recovery. This
 	  removes the unconditional serial-probe delay from every ordinary boot.
+
+	  Off by default because sw0 belongs to the application; the sample
+	  turns it on in prj.conf. Without it, the same retained byte can be
+	  written over SMP: CONFIG_RETENTION_BOOT_MODE plus
+	  CONFIG_MCUMGR_GRP_OS_RESET_BOOT_MODE let an os-group reset command
+	  carry a boot_mode field (1 is the bootloader). tinyfota's reset gate
+	  (reset_gate() in ports/zephyr/dfu_smp_img.c) refuses that reset
+	  unless an update window is open or a patch is staged, so it needs
+	  the application's own gesture first. MCUboot needs
+	  CONFIG_BOOT_SERIAL_BOOT_MODE and the same retention node
+	  (samples/nrf52833/sysbuild/mcuboot.overlay). `tinyfota push` does not
+	  send boot_mode.
 
 config TINYFOTA_RECOVERY_HOLD_MS
 	int "MCUboot recovery hold time, milliseconds"

@@ -38,6 +38,12 @@ LOG_MODULE_REGISTER(sample, LOG_LEVEL_INF);
  * empty. Two slots, and advertising restarted while one is free, is the fix
  * (ultrawidelock commit 91bf7f0f). An application built on this sample keeps
  * one slot for its own peer and one for the updater.
+ *
+ * ONE IS ENOUGH when an update and the application's own BLE use never
+ * overlap: a lock that uses BLE only to be commissioned can advertise the SMP
+ * service while the update window is open and its own link is down. This
+ * sample asserts two because it stands for an application whose peer stays
+ * connected.
  */
 BUILD_ASSERT(CONFIG_BT_MAX_CONN >= 2,
 	     "tinyfota: reserve a connection for updates -- set CONFIG_BT_MAX_CONN=2 or more");
