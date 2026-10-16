@@ -50,6 +50,50 @@ west build -p always -b decawave_dwm3001cdk --sysbuild -d <build> <app> -- \
 tinyfota writes no settings keys. Its only state is the `patch_staging`
 partition (`FORMAT.md`); `settings_storage` is untouched.
 
+## Board gate: five commands
+
+From the root of an NCS v3.3.0 workspace, with `tinyfota.conf` copied to
+`<app>/stacks/tinyfota.conf` and the other three files to `<app>`, and
+`tinyfota` installed (`pip install ./tools/tinyfota`). `<key>` is the absolute
+path to the signing key, the same in every command.
+
+```
+# 1. the base image, built and flashed; keep this build directory
+west build -p always -b decawave_dwm3001cdk --sysbuild -d <build>/fota-v1 <app> -- \
+  -DZEPHYR_EXTRA_MODULES="<tinytalk>;<tinyfota>" \
+  -DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/nrf-security.conf;stacks/tinyfota.conf" \
+  -DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=<key> && west flash -d <build>/fota-v1
+
+# 2. the changed image: the same line with one setting changed, the image version
+west build -p always -b decawave_dwm3001cdk --sysbuild -d <build>/fota-v2 <app> -- \
+  -DZEPHYR_EXTRA_MODULES="<tinytalk>;<tinyfota>" \
+  -DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/nrf-security.conf;stacks/tinyfota.conf" \
+  -DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=<key> '-DCONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION="1.0.1+0"'
+
+# 3. the delta; `info` prints the line to record (abi, patch bytes, file bytes)
+tinyfota build --from <build>/fota-v1/door-lock/zephyr/zephyr.signed.hex \
+  --to <build>/fota-v2/door-lock/zephyr/zephyr.signed.hex \
+  --build-dir <build>/fota-v2 --key <key> --out update.wdfu && tinyfota info update.wdfu
+
+# 4. open the update window on the lock, then push over BLE
+tinyfota push update.wdfu
+
+# 5. after MCUboot applies it: the board runs v2's SHA-256 (and --list shows 1.0.1)
+tinyfota push --expect <build>/fota-v2/door-lock/zephyr/zephyr.signed.bin
+```
+
+The application image's directory is named after `<app>`: `door-lock` here.
+`tinyfota push` finds the board by the SMP service UUID, not by name, and
+prints the name it connects to (`tinytalk`). With more than one board
+advertising SMP in range it lists them; pick one with `--address`. Steps 4
+and 5 need the application side above: the window gesture and the SMP
+advertisement.
+
+Steps 1 to 3 measured host-side 2026-10-17, on a snapshot of tinylock 7d468f5
+with tinytalk 9604083 and MCUboot's development key: both images 307,652 B
+flash / 101,216 B RAM, `record  abi 1, patch 5,775 B, file 5,871 B`, 23.5% of
+the 24,576 B patch capacity. Steps 4 and 5 are not yet run on a board.
+
 ## MCUboot serial recovery (optional)
 
 Not in the fragment. To reach MCUboot recovery over SMP, without a button, add

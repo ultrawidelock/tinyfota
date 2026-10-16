@@ -95,6 +95,8 @@ tinyfota push update.wdfu
 
 - **Keep the `.hex` of every build you ship.** It is the only thing a later
   update can be built from.
+- **An application that owns sw0** (a lock, one BLE connection) takes the
+  fragment and the five-command board gate in `samples/door-lock-fragment/`.
 - **That key is MCUboot's public dev key.** Fine on a desk, never in a
   product: set `SB_CONFIG_BOOT_SIGNATURE_KEY_FILE`.
 

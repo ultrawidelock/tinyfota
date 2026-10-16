@@ -601,6 +601,13 @@ def info(args):
           f"{'ok' if stored_crc == zlib.crc32(blob[:TINYFOTA_HDR_CRC_LEN]) else 'BAD'}")
     print(f"  patch crc   {'ok' if patch_crc == zlib.crc32(patch) else 'BAD'}")
     print(f"  patch len   {'ok' if patch_len == len(patch) else 'BAD'}")
+    # What a board gate records: the bytes that cross the air, the room they
+    # take in patch_staging (two control pages, then the patch) and the ABI.
+    print(f"  file        {len(blob):,} B  header {TINYFOTA_HDR_LEN} + signature "
+          f"{TINYFOTA_SIG_LEN} + patch {len(patch):,}")
+    print(f"  staging     {TINYFOTA_PATCH_OFFSET + len(patch):,} B  "
+          f"{TINYFOTA_PATCH_OFFSET:,} B of control pages + patch")
+    print(f"  record      abi {abi}, patch {len(patch):,} B, file {len(blob):,} B")
 
 
 def stage(args):
