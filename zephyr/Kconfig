@@ -107,6 +107,7 @@ config TINYFOTA_BLE_SMP
 	bool "BLE transport: SMP over GATT, what the shipped clients speak"
 	default y
 	depends on MCUMGR && MCUMGR_TRANSPORT_BT
+	depends on !TINYFOTA_TINYBLE
 	select TINYFOTA_SMP_IMG
 	help
 	  The update path every shipped client uses: `tinyfota push`
@@ -130,7 +131,7 @@ config TINYFOTA_BLE_SMP
 
 config TINYFOTA_BLE_GATT
 	bool "BLE transport: the native GATT service (d3b5a140)"
-	depends on BT_PERIPHERAL
+	depends on BT_PERIPHERAL && !TINYFOTA_TINYBLE
 	help
 	  ports/zephyr/dfu_ble_zephyr.c: the receiver's own frames (FORMAT.md)
 	  over a GATT characteristic (service d3b5a140, characteristic
@@ -140,12 +141,48 @@ config TINYFOTA_BLE_GATT
 
 config TINYFOTA_BLE_COC
 	bool "BLE transport: the native L2CAP CoC (PSM 0x0081)"
-	depends on BT_PERIPHERAL && BT_L2CAP_DYNAMIC_CHANNEL
+	depends on BT_PERIPHERAL && BT_L2CAP_DYNAMIC_CHANNEL && !TINYFOTA_TINYBLE
 	help
 	  ports/zephyr/dfu_ble_zephyr.c: the receiver's own frames over a
 	  dedicated L2CAP CoC (PSM 0x0081, 256 B SDUs). No shipped client opens
 	  it, so it is off by default. The only transport here that needs
 	  BT_L2CAP_DYNAMIC_CHANNEL, which in Zephyr also needs BT_SMP.
+
+config TINYFOTA_TINYBLE
+	bool "BLE transport on tinyble: SMP and the native frames, no mcumgr"
+	depends on TINYBLE
+	# Not select: ZCBOR is reachable from TINYFOTA_RECEIVER's own
+	# dependencies (PSA_WANT_ALG_ECDSA, selected by UOSCORE, which depends
+	# on ZCBOR), and a select here closes that into a Kconfig loop.
+	depends on ZCBOR
+	select TINYFOTA_SMP_IMG
+	help
+	  ports/zephyr/dfu_tinyble.c: the update channel when tinyble, not
+	  Zephyr's Bluetooth host, runs the radio. tinyble's
+	  CONFIG_TINYBLE_TINYFOTA adds the two GATT values and hands their
+	  writes here. SMP (service 8d53dc1d), which `tinyfota push` and nRF
+	  Device Manager speak, is served without mcumgr: image group 1
+	  (TINYFOTA_SMP_IMG below), os echo, reset behind the same gate, and
+	  mcumgr parameters. The native frames (service d3b5a140) are what
+	  `tinyfota push --native` speaks. The three transports above need
+	  Zephyr's host and are unavailable here.
+
+	  Everything runs on the system work queue, tinyble's one context:
+	  the flash writes and erases, and the PSA signature check.
+
+config TINYFOTA_TINYBLE_SMP_BUF
+	int "Largest SMP request reassembled on tinyble, bytes, header included"
+	depends on TINYFOTA_TINYBLE
+	default 384
+	range 256 4096
+	help
+	  A request may span several GATT writes; it is collected by the length
+	  in its 8-byte header, and one longer than this is refused with
+	  ENOMEM. mcumgr parameters (os group command 6) report it as
+	  buf_size, which nRF Device Manager sizes its uploads to. 384 is
+	  CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE in the Zephyr-host door-lock
+	  build. 256 holds the largest request `tinyfota push` sends at the
+	  247 B ATT MTU.
 
 config TINYFOTA_BUTTON
 	bool "sw0 opens the update window"
@@ -195,7 +232,7 @@ config TINYFOTA_RECOVERY_HOLD_MS
 
 config TINYFOTA_SMP_IMG
 	bool "Serve SMP group 1, so stock mcumgr clients can push an update"
-	depends on MCUMGR
+	depends on MCUMGR || TINYFOTA_TINYBLE
 	help
 	  Answer the mcumgr image-management group with the receiver above, so
 	  that nRF Device Manager, nRF Connect for iOS or the `mcumgr` CLI can
@@ -216,6 +253,8 @@ config TINYFOTA_SMP_IMG
 
 	  TINYFOTA_BLE_SMP above selects this for SMP over Bluetooth; set it
 	  alone for SMP over another transport (uart0 in the sample).
+	  TINYFOTA_TINYBLE selects it for its own SMP server, which serves the
+	  same commands (ports/zephyr/smp_group.c) without mcumgr.
 
 	  You must also set CONFIG_MCUMGR_TRANSPORT_BT and a permission choice.
 	  Note what that costs -- MCUMGR_TRANSPORT_BT_PERM_RW hands an

@@ -135,6 +135,11 @@ DWM3001CDK, NCS v3.3.0, the sample's application image:
 The SMP-only build also drops `BT_SMP` and `BT_L2CAP_DYNAMIC_CHANNEL`, which
 only the CoC needs.
 
+On tinyble, a minimal BLE host that replaces Zephyr's, `TINYFOTA_TINYBLE`
+serves SMP and the native frames itself, without mcumgr. The image group and
+the reset gate are the same code the mcumgr build registers
+(`ports/zephyr/smp_group.c`).
+
 ## Proof
 
 | Test            | What it did                                                    | Result                                           |
@@ -161,6 +166,7 @@ make asan       # same, under sanitizers
 make seams      # the port's symbols match tests/seams.expected
 make powercut   # power-cut simulator, about 45 s
 make wire       # browser and CLI send identical bytes (needs node)
+make tinyble ZCBOR=<zcbor>   # the tinyble transport over real zcbor
 ```
 
 If `cc` or `nm` is not a working tool: `make test CC=/usr/bin/clang NM="xcrun nm"`.

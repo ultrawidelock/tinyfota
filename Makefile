@@ -53,7 +53,7 @@ ADD_SRCS := tests/host/test.c tests/host/test_tinyfota.c \
 	tests/host/port/osal_host.c tests/host/port/flash_host.c \
 	core/dfu_crc.c core/dfu_receiver.c core/dfu_applier.c ports/zephyr/crypto_psa.c
 
-.PHONY: test asan seams wire tooling powercut fuzz fuzz-run clean
+.PHONY: test asan seams wire tooling powercut fuzz fuzz-run tinyble clean
 
 $(BUILD)/host_test_dfu: $(TEST_SRCS) $(TEST_HDRS)
 	@mkdir -p $(@D)
@@ -78,6 +78,40 @@ test: $(BUILD)/host_test_dfu $(BUILD)/host_test_tinyfota
 asan: $(BUILD)/host_test_dfu_asan $(BUILD)/host_test_tinyfota_asan
 	$(BUILD)/host_test_dfu_asan
 	$(BUILD)/host_test_tinyfota_asan
+
+# The update channel on tinyble (ports/zephyr/dfu_tinyble.c) and the SMP
+# request decoder (smp_decode.c), fed real SMP request bytes and checked
+# against the bytes they notify, over the REAL zcbor. zcbor is not vendored
+# here: ZCBOR names a checkout, and every NCS or Zephyr workspace has one at
+# modules/lib/zcbor. tinyble and the work queue are doubles (tests/host/tbfake).
+# zcbor is compiled as shipped, with only its own warnings silenced.
+ZCBOR ?=
+TB := $(BUILD)/tinyble
+TB_DEFS := -DTINYFOTA_PORT_HOST -D_DEFAULT_SOURCE -DCONFIG_TINYFOTA_SMP_IMG=1 \
+	-DCONFIG_TINYFOTA_TINYBLE=1 -DCONFIG_TINYFOTA_TINYBLE_SMP_BUF=384
+TB_INCS := -Itests/host -Itests/host/tbfake -Itests/host/port -Itests/host/dfufake \
+	-Itests/host/logfake -Itests/host/psafake -Iinclude -Icore -Iports/zephyr -I$(ZCBOR)/include
+TB_SRCS := tests/host/test.c tests/host/test_tinyble.c tests/host/tbfake/tbfake.c \
+	tests/host/dfufake/dfufake.c tests/host/psafake/psafake.c \
+	tests/host/port/osal_host.c tests/host/port/flash_host.c \
+	core/dfu_crc.c core/dfu_receiver.c ports/zephyr/crypto_psa.c \
+	ports/zephyr/smp_group.c ports/zephyr/smp_decode.c ports/zephyr/dfu_tinyble.c
+ZCBOR_SRCS := $(addprefix $(ZCBOR)/src/,zcbor_common.c zcbor_decode.c zcbor_encode.c)
+
+tinyble:
+	@test -n "$(ZCBOR)" -a -f "$(ZCBOR)/src/zcbor_decode.c" || \
+		{ echo "make tinyble needs ZCBOR=<a zcbor checkout>, e.g. <workspace>/modules/lib/zcbor"; exit 1; }
+	@mkdir -p $(TB)/plain $(TB)/asan
+	@for f in $(ZCBOR_SRCS); do \
+		$(CC) $(CSTD) -w -I$(ZCBOR)/include -c $$f -o $(TB)/plain/$$(basename $$f .c).o || exit 1; \
+		$(CC) $(CSTD) -w $(SAN) -I$(ZCBOR)/include -c $$f -o $(TB)/asan/$$(basename $$f .c).o || exit 1; \
+	done
+	$(CC) $(CSTD) $(TEST_WARN) $(TB_DEFS) $(TB_INCS) $(TB_SRCS) $(TB)/plain/*.o \
+		-o $(TB)/host_test_tinyble
+	$(CC) $(CSTD) $(TEST_WARN) $(SAN) $(TB_DEFS) $(TB_INCS) $(TB_SRCS) $(TB)/asan/*.o \
+		-o $(TB)/host_test_tinyble_asan
+	$(TB)/host_test_tinyble
+	$(TB)/host_test_tinyble_asan
 
 # The symbols the core leaves for a port to provide: everything a core object
 # references that no core or vendored object defines. The vendored detools is

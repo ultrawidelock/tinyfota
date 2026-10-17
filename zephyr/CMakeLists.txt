@@ -121,8 +121,14 @@ if(CONFIG_TINYFOTA_RECEIVER)
   zephyr_library_sources_ifdef(CONFIG_TINYFOTA_BLE ${TINYFOTA_PORT_ZEPHYR}/dfu_ble_zephyr.c)
   # The optional SMP image-group front door onto this receiver; see the
   # Kconfig help for why Zephyr's own img_mgmt cannot be used here.
-  zephyr_library_sources_ifdef(CONFIG_TINYFOTA_SMP_IMG ${TINYFOTA_PORT_ZEPHYR}/dfu_smp_img.c
+  # The commands are shared; mcumgr's registration only where mcumgr is.
+  if(CONFIG_TINYFOTA_SMP_IMG AND CONFIG_MCUMGR)
+    zephyr_library_sources(${TINYFOTA_PORT_ZEPHYR}/dfu_smp_img.c)
+  endif()
+  zephyr_library_sources_ifdef(CONFIG_TINYFOTA_SMP_IMG
     ${TINYFOTA_PORT_ZEPHYR}/smp_group.c ${TINYFOTA_PORT_ZEPHYR}/smp_decode.c)
+  # SMP and the native frames on tinyble, which has no mcumgr.
+  zephyr_library_sources_ifdef(CONFIG_TINYFOTA_TINYBLE ${TINYFOTA_PORT_ZEPHYR}/dfu_tinyble.c)
 
   # zephyr_include_directories, not the _library_ form: the application calls
   # tinyfota_window_open() and has to include tinyfota_rx.h. The _library_
