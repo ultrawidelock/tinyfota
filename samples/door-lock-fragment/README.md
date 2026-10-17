@@ -9,6 +9,7 @@ reference these lines are cut from, and its files say why each line is there.
 | File here | Goes to, in the application | What it is |
 |---|---|---|
 | `tinyfota.conf` | `stacks/tinyfota.conf`, last in `CONF_FILE` | the receiver, SMP over Bluetooth, the reset gate |
+| `tinyfota-tinyble.conf` | `stacks/tinyfota-tinyble.conf`, last in `CONF_FILE`, INSTEAD of `tinyfota.conf` on a tinyble build | the receiver on tinyble: SMP and the native frames without mcumgr, the SMP UUID in the scan response |
 | `sysbuild.conf` | `stacks/tinyfota/sysbuild.conf`, as `SB_CONF_FILE` | MCUboot, single slot, ECDSA P-256 |
 | `mcuboot.conf` | `stacks/tinyfota/mcuboot.conf`, as `mcuboot_CONF_FILE` | MCUboot's whole configuration: `BOOT_VALIDATE_SLOT0`, the applier, size trims |
 | `pm_static.yml` | `stacks/tinyfota/pm_static.yml`, as `PM_STATIC_YML_FILE` | the four partitions; `make tooling` checks it against the sample's |
@@ -50,6 +51,28 @@ west build -p always -b decawave_dwm3001cdk --sysbuild -d <build> <app> -- \
   manager. `zephyr/Kconfig` gives `MCUBOOT_UPDATE_FOOTER_SIZE` a prompt in a
   single-slot receiver build, so the value MCUboot's sysbuild module assigns
   to every application lands; its comment says why there is no other way.
+
+### On tinyble
+
+With tinyble in place of Zephyr's Bluetooth host, `tinyfota-tinyble.conf`
+replaces `tinyfota.conf` and the other three files stay as they are. tinyble
+must carry `CONFIG_TINYBLE_TINYFOTA` (the fragment sets it), which adds the
+SMP and native services to its GATT table and hands their writes to
+`CONFIG_TINYFOTA_TINYBLE`. No mcumgr is built; `zephyr/Kconfig` says what the
+transport serves.
+
+```
+west build -p always -b decawave_dwm3001cdk --sysbuild -d <build> <app> -- \
+  -DZEPHYR_EXTRA_MODULES="<tinytalk>;<tinyble>;<tinygrid>;<tinypsa>;<tinyfota>" \
+  -DCONF_FILE="prj.conf;stacks/tinyble.conf;stacks/tinygrid.conf;stacks/tinypsa.conf;stacks/tinyfota-tinyble.conf" \
+  -DSB_CONF_FILE=stacks/tinyfota/sysbuild.conf \
+  -DPM_STATIC_YML_FILE=stacks/tinyfota/pm_static.yml \
+  -Dmcuboot_CONF_FILE=<absolute path to app>/stacks/tinyfota/mcuboot.conf \
+  '-DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE="<absolute path to the signing key>"'
+```
+
+`tinyfota push update.wdfu` speaks SMP to it as to the Zephyr-host build;
+`tinyfota push --native update.wdfu` sends the native frames instead.
 
 ## What the application does
 
@@ -137,6 +160,19 @@ its stock stacks, tinytalk 9604083:
 | Application with `tinyfota.conf` | 308,064 B of 433,664 B | 101,216 B |
 | Added by tinyfota and mcumgr | 9,108 B | 3,968 B |
 | MCUboot with `mcuboot.conf` | 25,512 B of 40,960 B | 14,464 B |
+
+Re-measured 2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, on tinylock b33f550
+with tinytalk 4e14cfc and MCUboot's development key, with the command above
+and this directory at tinyfota's commit that added `tinyfota-tinyble.conf`:
+
+| Build | Application | MCUboot |
+|---|---|---|
+| Zephyr host, `tinyfota.conf` | 314,176 B flash / 101,408 B RAM | 25,512 B / 14,464 B |
+| tinyble 8ecda5d, tinygrid b8e3b4a, tinypsa d556143, `tinyfota-tinyble.conf` | 215,824 B flash / 70,680 B RAM | 25,512 B / 14,464 B |
+
+In the tinyble build the transport's buffers are 588 B of RAM (`s_smp`: the
+384 B request, the 192 B reply and their counters) and its two work items
+48 B each. Both builds print no "was assigned" Kconfig warning.
 
 Re-measured 2026-10-17 on a snapshot of tinylock 46a7115 with the layout and
 command above: application 307,652 B / 101,216 B, MCUboot 25,512 B /
