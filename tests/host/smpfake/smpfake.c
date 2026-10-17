@@ -5,12 +5,12 @@
 
 #include <string.h>
 
-#include <mgmt/mcumgr/util/zcbor_bulk.h>
 #include <zcbor_common.h>
-#include <zcbor_decode.h>
 #include <zcbor_encode.h>
 #include <zephyr/mgmt/mcumgr/mgmt/callbacks.h>
 #include <zephyr/mgmt/mcumgr/mgmt/mgmt.h>
+
+#include "smp_group.h"
 
 struct smpfake_state smpfake;
 
@@ -229,44 +229,16 @@ bool zcbor_bool_put(zcbor_state_t *state, bool value)
 
 /* ---- decoder --------------------------------------------------------------
  *
- * Never reached individually: zcbor_map_decode_bulk() writes through the
- * value pointers itself. They exist so a key table can name a decoder, which
- * is how the handler under test is written.
+ * Stands in for tinyfota_smp_map_decode() (ports/zephyr/smp_decode.c), which
+ * the suite over real zcbor tests (tests/host/test_tinyble.c). Here no CBOR
+ * exists, so the zcbor decoders are not reached at all.
  */
 
-bool zcbor_bstr_decode(zcbor_state_t *state, struct zcbor_string *result)
-{
-	(void)state;
-	(void)result;
-	return true;
-}
-
-bool zcbor_bool_decode(zcbor_state_t *state, bool *result)
-{
-	(void)state;
-	(void)result;
-	return true;
-}
-
-bool zcbor_uint32_decode(zcbor_state_t *state, uint32_t *result)
-{
-	(void)state;
-	(void)result;
-	return true;
-}
-
-bool zcbor_size_decode(zcbor_state_t *state, size_t *result)
-{
-	(void)state;
-	(void)result;
-	return true;
-}
-
 /* Match the handler's key table against the fields the suite installed, and
- * write each match through the table's own value pointer using the decoder it
- * named — so a handler that wires the wrong decoder to a key is caught. */
-int zcbor_map_decode_bulk(zcbor_state_t *state, struct zcbor_map_decode_key_val *map,
-			  size_t map_size, size_t *matched)
+ * write each match through the table's own value pointer using the type it
+ * named — so a handler that wires the wrong type to a key is caught. */
+int tinyfota_smp_map_decode(zcbor_state_t *state, struct tinyfota_smp_key *map,
+			    size_t map_size, size_t *matched)
 {
 	size_t found = 0;
 
@@ -283,27 +255,27 @@ int zcbor_map_decode_bulk(zcbor_state_t *state, struct zcbor_map_decode_key_val 
 			const struct smpfake_kv *kv = &request_kv[k];
 			size_t key_len = strlen(kv->key);
 
-			if (key_len != map[i].key.len ||
-			    memcmp(kv->key, map[i].key.value, key_len) != 0) {
+			if (key_len != map[i].key_len ||
+			    memcmp(kv->key, map[i].key, key_len) != 0) {
 				continue;
 			}
-			if (map[i].decoder == (void *)zcbor_uint32_decode &&
+			if (map[i].type == TINYFOTA_SMP_UINT32 &&
 			    kv->kind == SMPFAKE_UINT) {
-				*(uint32_t *)map[i].value_ptr = (uint32_t)kv->value;
-			} else if (map[i].decoder == (void *)zcbor_size_decode &&
+				*(uint32_t *)map[i].value = (uint32_t)kv->value;
+			} else if (map[i].type == TINYFOTA_SMP_SIZE &&
 				   kv->kind == SMPFAKE_UINT) {
-				*(size_t *)map[i].value_ptr = (size_t)kv->value;
-			} else if (map[i].decoder == (void *)zcbor_bool_decode &&
+				*(size_t *)map[i].value = (size_t)kv->value;
+			} else if (map[i].type == TINYFOTA_SMP_BOOL &&
 				   kv->kind == SMPFAKE_BOOL) {
-				*(bool *)map[i].value_ptr = kv->value != 0U;
-			} else if (map[i].decoder == (void *)zcbor_bstr_decode &&
+				*(bool *)map[i].value = kv->value != 0U;
+			} else if (map[i].type == TINYFOTA_SMP_BSTR &&
 				   kv->kind == SMPFAKE_BSTR) {
-				struct zcbor_string *out = map[i].value_ptr;
+				struct zcbor_string *out = map[i].value;
 
 				out->value = kv->bytes;
 				out->len = kv->len;
 			} else {
-				/* The handler named a decoder that does not fit
+				/* The handler named a type that does not fit
 				 * the field. Leave it unmatched rather than
 				 * papering over it. */
 				continue;

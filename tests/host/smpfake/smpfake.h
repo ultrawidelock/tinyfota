@@ -9,7 +9,7 @@
  * or a reordered map all fail; a malformed CBOR byte would not be noticed,
  * because nothing here produces CBOR bytes at all.
  *
- * THE DECODER IS TABLE-DRIVEN for the same reason. zcbor_map_decode_bulk()
+ * THE DECODER IS TABLE-DRIVEN for the same reason. tinyfota_smp_map_decode()
  * serves whatever key/value set the suite installed with smpfake_request(),
  * so a request is described in terms of its fields rather than hand-encoded.
  *
@@ -52,7 +52,7 @@ struct smpfake_item {
 	size_t len;
 };
 
-/** One field a suite wants zcbor_map_decode_bulk() to produce. */
+/** One field a suite wants tinyfota_smp_map_decode() to produce. */
 struct smpfake_kv {
 	const char *key;
 	enum smpfake_kind kind;
@@ -69,7 +69,7 @@ struct smpfake_state {
 
 	/* knobs */
 	int encode_fail_in;  /**< -1 never; else fail the Nth put onward */
-	int decode_bulk_ret; /**< returned by zcbor_map_decode_bulk() */
+	int decode_bulk_ret; /**< returned by tinyfota_smp_map_decode() */
 
 	/* recorded decoder side */
 	unsigned decode_bulk_calls;
@@ -87,7 +87,7 @@ extern struct smpfake_state smpfake;
 /** @brief Zero every recording and restore both knobs. */
 void smpfake_reset(void);
 
-/** @brief Install the fields the next zcbor_map_decode_bulk() will produce. */
+/** @brief Install the fields the next tinyfota_smp_map_decode() will produce. */
 void smpfake_request(const struct smpfake_kv *kv, size_t count);
 
 /** @brief Index of the first recorded item whose text is @p key, or -1. */

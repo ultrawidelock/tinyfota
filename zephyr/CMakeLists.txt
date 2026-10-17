@@ -121,7 +121,8 @@ if(CONFIG_TINYFOTA_RECEIVER)
   zephyr_library_sources_ifdef(CONFIG_TINYFOTA_BLE ${TINYFOTA_PORT_ZEPHYR}/dfu_ble_zephyr.c)
   # The optional SMP image-group front door onto this receiver; see the
   # Kconfig help for why Zephyr's own img_mgmt cannot be used here.
-  zephyr_library_sources_ifdef(CONFIG_TINYFOTA_SMP_IMG ${TINYFOTA_PORT_ZEPHYR}/dfu_smp_img.c)
+  zephyr_library_sources_ifdef(CONFIG_TINYFOTA_SMP_IMG ${TINYFOTA_PORT_ZEPHYR}/dfu_smp_img.c
+    ${TINYFOTA_PORT_ZEPHYR}/smp_group.c ${TINYFOTA_PORT_ZEPHYR}/smp_decode.c)
 
   # zephyr_include_directories, not the _library_ form: the application calls
   # tinyfota_window_open() and has to include tinyfota_rx.h. The _library_

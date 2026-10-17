@@ -37,13 +37,13 @@ TEST_DEFS := -DTINYFOTA_PORT_HOST -D_DEFAULT_SOURCE -DCONFIG_TINYFOTA_SMP_IMG=1 
 	-DCONFIG_TINYFOTA_APPLIER_CHUNK=256 -DCONFIG_MCUMGR_GRP_OS_RESET_HOOK=1 \
 	-DCONFIG_MCUMGR_GRP_ENUM_DETAILS_NAME=1 -DCONFIG_MCUMGR_SMP_LEGACY_RC_BEHAVIOUR=1
 TEST_INCS := -Itests/host -Itests/host/port -Itests/host/dfufake -Itests/host/smpfake \
-	-Itests/host/logfake -Itests/host/psafake -Iinclude -Icore
+	-Itests/host/logfake -Itests/host/psafake -Iinclude -Icore -Iports/zephyr
 TEST_SRCS := tests/host/test.c tests/host/test_dfu.c tests/host/test_dfu_smp.c \
 	tests/host/dfufake/dfufake.c tests/host/smpfake/smpfake.c tests/host/psafake/psafake.c \
 	tests/host/port/osal_host.c tests/host/port/flash_host.c \
 	core/dfu_crc.c core/dfu_receiver.c core/dfu_applier.c \
-	ports/zephyr/crypto_psa.c ports/zephyr/dfu_smp_img.c
-TEST_HDRS := $(wildcard include/tinyfota/*.h core/*.h tests/host/*.h tests/host/*/*.h \
+	ports/zephyr/crypto_psa.c ports/zephyr/dfu_smp_img.c ports/zephyr/smp_group.c
+TEST_HDRS := $(wildcard include/tinyfota/*.h core/*.h ports/zephyr/*.h tests/host/*.h tests/host/*/*.h \
 	tests/host/*/*/*.h tests/host/*/*/*/*.h tests/host/*/*/*/*/*.h tests/host/*/*/*/*/*/*.h)
 
 # Behaviour tinyfota added to the imported core, in its own binary so the
