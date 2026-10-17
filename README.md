@@ -121,8 +121,9 @@ Measured 2026-10-16 on the nRF52833 DK.
 
 The Bluetooth transports are separate Kconfig symbols: `TINYFOTA_BLE_SMP`
 (SMP over GATT, what `tinyfota push`, the browser page and nRF Device Manager
-speak), and the native `TINYFOTA_BLE_GATT` and `TINYFOTA_BLE_COC`, which no
-shipped client uses and which are off by default. The sample builds SMP only;
+speak), and the native `TINYFOTA_BLE_GATT` and `TINYFOTA_BLE_COC`, which are
+off by default: only `tinyfota push --native` speaks the first, and nothing
+shipped opens the second. The sample builds SMP only;
 `-DEXTRA_CONF_FILE=native.conf` adds the other two. Measured 2026-10-16 on the
 DWM3001CDK, NCS v3.3.0, the sample's application image:
 

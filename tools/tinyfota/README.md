@@ -53,7 +53,22 @@ If `cc` or `c++` on your PATH is not a working compiler, point pip at one:
 `push` finds a board by the SMP service UUID it advertises, never by name: a
 31-byte advertisement truncates names, and a name filter then fails silently.
 When more than one board advertises the service, `push` lists them and asks for
-`--address`.
+`--address`. The UUID counts whether it came in the advertisement or the scan
+response: `push` keeps every report a device sends during the scan, so a board
+that puts it in the scan response is found even when its advertisement came
+last.
+
+## Native frames
+
+`push --native update.wdfu` sends the receiver's own frames (`FORMAT.md`) to
+the native characteristic (`d3b5a141`) instead of SMP: BEGIN, DATA sized to
+the ATT MTU (MTU - 12 B of patch a frame), then COMMIT, after which the board
+restarts by itself. When a reply reports an offset other than the one sent,
+`push` resends from there; it resends a frame whose reply does not come within
+10 s, three times. It finds the board by the SMP or the native service UUID,
+and takes a `.wdfu` or its wrapped `.bin`. A board serves it with
+`CONFIG_TINYFOTA_TINYBLE` or `CONFIG_TINYFOTA_BLE_GATT`. `--list`,
+`--expect`, `--serial` and `--no-reset` are SMP only.
 
 ## Releases
 

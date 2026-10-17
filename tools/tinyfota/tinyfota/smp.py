@@ -7,8 +7,11 @@ the fault is in the app or the file it is given, not in the firmware.
 
     tinyfota push update.wdfu                 push a patch
     tinyfota push --list                      read the image list and stop
+    tinyfota push --native update.wdfu        push over tinyfota's own frames
 
-Requires the board to serve the SMP image group (CONFIG_TINYFOTA_SMP_IMG).
+Requires the board to serve the SMP image group (CONFIG_TINYFOTA_SMP_IMG), or,
+with --native, the native GATT service (CONFIG_TINYFOTA_TINYBLE or
+CONFIG_TINYFOTA_BLE_GATT).
 
 CBOR IS HAND-ROLLED HERE, deliberately. The maps mcumgr exchanges are half a
 dozen keys of ints and byte strings, and vendoring a CBOR library into the OTA
@@ -19,6 +22,7 @@ import argparse
 import base64
 import binascii
 import asyncio
+import os
 import struct
 import sys
 from pathlib import Path
@@ -38,6 +42,26 @@ SMP_CHR_UUID = "da2e7828-fbce-4e01-ae9e-261174997c48"
 # is the one identifier meaning "this board speaks exactly the protocol I am
 # about to speak". It is checked in the UUID list and in the service data.
 SMP_SVC_SHORT = "8d53dc1d"
+
+# The receiver's own frames (FORMAT.md, core/tinyfota_rx.h) on one notifying
+# characteristic. A board on tinyble serves it beside SMP and advertises only
+# the SMP UUID, so --native finds a board by either.
+NATIVE_SVC_UUID = "d3b5a140-9e23-4b3a-8be4-6b1ee5f980a3"
+NATIVE_CHR_UUID = "d3b5a141-9e23-4b3a-8be4-6b1ee5f980a3"
+NATIVE_SVC_SHORT = "d3b5a140"
+NATIVE_BEGIN, NATIVE_DATA, NATIVE_COMMIT = 0x11, 0x12, 0x13
+NATIVE_OK, NATIVE_ERR = 0x81, 0x82
+NATIVE_ERRORS = {
+    1: "no update window is open (press the board's update button)",
+    2: "out of sequence",
+    3: "too large for patch_staging",
+    4: "the header signature did not verify",
+    5: "length or CRC disagreed at commit",
+    6: "a flash write or erase failed",
+    7: "malformed frame",
+    8: "another transport owns the receiver",
+    9: "built for a different image than the one running",
+}
 
 OP_READ_REQ, OP_READ_RSP, OP_WRITE_REQ, OP_WRITE_RSP = 0, 1, 2, 3
 GRP_OS, GRP_IMG = 0, 1
@@ -590,33 +614,188 @@ async def run_serial(args):
         transport.close()
 
 
+class Sightings:
+    """Every service UUID each device has shown, over the whole scan.
+
+    CUMULATIVE ON PURPOSE. A board that keeps its advertisement for something
+    else puts the SMP UUID in its scan response (the door-lock on tinyble
+    does), and the advertisement and the scan response arrive as separate
+    reports. A scan that keeps only each device's latest report, as
+    BleakScanner.discover() does, loses the UUID whenever the last report
+    seen was the advertisement. Collecting the union of every report keeps it.
+    """
+
+    def __init__(self, shorts):
+        self.shorts = shorts
+        self.uuids = {}
+        self.devices = {}
+
+    def see(self, dev, adv):
+        u = self.uuids.setdefault(dev.address, set())
+        u |= {x.lower() for x in (adv.service_uuids or [])}
+        u |= {x.lower() for x in (adv.service_data or {})}
+        # The newest device object: it carries the newest name.
+        self.devices[dev.address] = dev
+
+    def boards(self, address=""):
+        out = []
+        for addr, uuids in self.uuids.items():
+            if not any(s in u for s in self.shorts for u in uuids):
+                continue
+            if address and addr.lower() != address.lower():
+                continue
+            out.append(self.devices[addr])
+        return out
+
+
+async def find_board(args, shorts, what):
+    """Scan for args.scan seconds; the one board showing a UUID in shorts."""
+    from bleak import BleakScanner
+
+    print("scanning...")
+    seen = Sightings(shorts)
+    async with BleakScanner(detection_callback=seen.see):
+        await asyncio.sleep(args.scan)
+    boards = seen.boards(args.address)
+    if not boards:
+        die(f"no board advertising {what} was found. Is it powered and in range?")
+    if len(boards) > 1:
+        listed = "\n".join(f"    {d.address}  {d.name or ''}" for d in boards)
+        die(f"{len(boards)} boards advertise {what}; pick one with --address:\n{listed}")
+    return boards[0]
+
+
+# ---- the native frames --------------------------------------------------------
+
+
+class Native:
+    """One conversation in the receiver's own frames: a frame out, a reply back.
+
+    Every frame is idempotent by design (core/dfu_receiver.c): a BEGIN that
+    matches the transfer in progress is answered with its position, and a DATA
+    at any offset other than the receiver's is answered with the receiver's
+    offset and changes nothing. So a lost reply costs a resend, never a
+    corrupted transfer.
+    """
+
+    def __init__(self, client, mtu):
+        self.client = client
+        self.replies = asyncio.Queue()
+        # One DATA frame per write: the ATT payload is MTU - 3, and the frame
+        # spends 9 B on its opcode, transfer id and offset.
+        self.room = max(1, mtu - 3 - 9)
+        self.timeout = 10.0
+
+    def on_notify(self, _sender, data):
+        self.replies.put_nowait(bytes(data))
+
+    async def call(self, frame, tries=3):
+        """Send one frame and return its reply, resending on silence."""
+        for _ in range(tries):
+            while not self.replies.empty():
+                self.replies.get_nowait()          # a late reply to an old frame
+            await self.client.write_gatt_char(NATIVE_CHR_UUID, frame, response=False)
+            try:
+                return await asyncio.wait_for(self.replies.get(), self.timeout)
+            except asyncio.TimeoutError:
+                continue
+        die("the board stopped answering")
+
+
+def native_ok(rsp, transfer_id):
+    """The next offset from an OK reply, or the process ends with the board's reason."""
+    if len(rsp) == 2 and rsp[0] == NATIVE_ERR:
+        die(f"refused: {NATIVE_ERRORS.get(rsp[1], f'error {rsp[1]}')}")
+    if len(rsp) != 9 or rsp[0] != NATIVE_OK:
+        die(f"unexpected reply {rsp.hex()}")
+    tid, nxt = struct.unpack_from("<II", rsp, 1)
+    if tid != transfer_id:
+        die(f"reply for transfer {tid:#x}, not {transfer_id:#x}")
+    return nxt
+
+
+def native_payload(blob):
+    """The bytes the receiver takes: a raw .wdfu, or the one inside a wrapped file."""
+    if blob[:4] == b"WDFU":
+        return blob
+    if len(blob) >= 16 and struct.unpack_from("<I", blob, 0)[0] == 0x96F3B83D:
+        hdr_sz, img_sz = struct.unpack_from("<H", blob, 8)[0], struct.unpack_from("<I", blob, 12)[0]
+        inner = blob[hdr_sz : hdr_sz + img_sz]
+        if inner[:4] == b"WDFU":
+            # SMP steps over the wrapper on the board; the native frames do
+            # not, so it comes off here.
+            return inner
+        die("a whole MCUboot image goes to MCUboot's serial recovery: --serial, not --native")
+    die("neither a .wdfu nor a wrapped one. Fix: tinyfota build")
+
+
+async def push_native(native, blob, transfer_id=None):
+    """BEGIN, DATA from wherever the board says it is, COMMIT. Returns frames sent."""
+    if transfer_id is None:
+        transfer_id = int.from_bytes(os.urandom(4), "little") or 1
+    total = len(blob)
+    frames = 0
+
+    off = native_ok(await native.call(struct.pack("<BII", NATIVE_BEGIN, transfer_id, total)),
+                    transfer_id)
+    frames += 1
+    print(f"pushing {total} B in {native.room} B frames")
+    stuck = 0
+    while off < total:
+        chunk = blob[off : off + native.room]
+        nxt = native_ok(await native.call(struct.pack("<BII", NATIVE_DATA, transfer_id, off)
+                                          + chunk), transfer_id)
+        frames += 1
+        if nxt > total:
+            die(f"the board reports offset {nxt}, past the {total} B sent")
+        # Anything but off + len(chunk) is the board saying where it really
+        # is, after a lost frame or reply: resend from there.
+        stuck = stuck + 1 if nxt <= off else 0
+        if stuck >= 3:
+            die("the board is not advancing; it refused the frame silently")
+        off = nxt
+        print(f"\r  {off}/{total} B", end="", flush=True)
+    print()
+    native_ok(await native.call(struct.pack("<BI", NATIVE_COMMIT, transfer_id)), transfer_id)
+    frames += 1
+    print(" staged; the board restarts by itself and MCUboot applies the patch")
+    return frames
+
+
+async def run_native(args):
+    try:
+        from bleak import BleakClient
+    except ImportError:
+        die("bleak is not installed. Fix: pip install ./tools/tinyfota")
+
+    blob = native_payload(Path(args.patch).read_bytes())
+    device = await find_board(args, (SMP_SVC_SHORT, NATIVE_SVC_SHORT), "the SMP or native service")
+    print(f"connecting to {device.name or device.address}")
+    # services=[...] for the reason given in run() below.
+    async with BleakClient(device, services=[NATIVE_SVC_UUID]) as client:
+        native = Native(client, getattr(client, "mtu_size", 0) or 23)
+        await client.start_notify(NATIVE_CHR_UUID, native.on_notify)
+        await push_native(native, blob)
+        # COMMIT restarts the board; the link drops under the context exit.
+        await asyncio.sleep(1.0)
+
+
 async def run(args):
     if args.serial:
         await run_serial(args)
         return
+    if args.native:
+        await run_native(args)
+        return
 
     try:
-        from bleak import BleakClient, BleakScanner
+        from bleak import BleakClient
     except ImportError:
         die("bleak is not installed. Fix: pip install ./tools/tinyfota")
 
-    print("scanning...")
-    found = await BleakScanner.discover(timeout=args.scan, return_adv=True)
-    boards = []
-    for dev, adv in found.values():
-        uuids = {u.lower() for u in (adv.service_uuids or [])}
-        uuids |= {u.lower() for u in (adv.service_data or {})}
-        # The SMP service itself, in the UUID list or the service data.
-        # Unambiguous: it is the exact service this tool is about to talk to.
-        if any(SMP_SVC_SHORT in u for u in uuids):
-            if not args.address or dev.address.lower() == args.address.lower():
-                boards.append(dev)
-    if not boards:
-        die("no board advertising the SMP service was found. Is it powered and in range?")
-    if len(boards) > 1:
-        listed = "\n".join(f"    {d.address}  {d.name or ''}" for d in boards)
-        die(f"{len(boards)} boards advertise the SMP service; pick one with --address:\n{listed}")
-    device = boards[0]
+    # The SMP service itself, in the UUID list or the service data.
+    # Unambiguous: it is the exact service this tool is about to talk to.
+    device = await find_board(args, (SMP_SVC_SHORT,), "the SMP service")
 
     print(f"connecting to {device.name or device.address}")
     # services=[...] on purpose. In the source project a third-party descriptor
@@ -649,6 +828,10 @@ def add_arguments(ap):
     # conclusion entirely.
     ap.add_argument("--scan", type=float, default=12.0, help="scan seconds")
     ap.add_argument("--no-reset", action="store_true", help="stage without rebooting")
+    # The receiver's own frames instead of SMP: BEGIN, DATA sized to the ATT
+    # MTU, COMMIT, which restarts the board itself. Bluetooth only.
+    ap.add_argument("--native", action="store_true",
+                    help="push over tinyfota's native GATT frames (d3b5a141) instead of SMP")
     # THE CABLE. On the DWM3001CDK uart0 is the J-Link OB's VCOM, so this is the
     # port the probe already presents -- no second cable, and no scan.
     ap.add_argument(
@@ -674,6 +857,9 @@ def push(args):
     """`tinyfota push`: the whole exchange, over Bluetooth or the cable."""
     if not args.list and not args.expect and not args.patch:
         die("give a patch file, or --list, or --expect")
+    if args.native and (args.list or args.expect or args.serial or args.no_reset or not args.patch):
+        die("--native pushes a patch over Bluetooth, and COMMIT restarts the board: "
+            "--list, --expect, --serial and --no-reset are SMP's")
     asyncio.run(run(args))
 
 
