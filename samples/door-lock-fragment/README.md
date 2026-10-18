@@ -132,7 +132,7 @@ advertising SMP in range it lists them; pick one with `--address`. Steps 4
 and 5 need the application side above: the window gesture and the SMP
 advertisement.
 
-Steps 1 to 3 measured host-side 2026-10-17, on a snapshot of tinylock 7d468f5
+Steps 1 to 3 measured host-side 2026-10-17, on a snapshot of tinylock f074054
 with tinytalk 9604083 and MCUboot's development key: both images 307,652 B
 flash / 101,216 B RAM, `record  abi 1, patch 5,775 B, file 5,871 B`, 23.5% of
 the 24,576 B patch capacity. Steps 4 and 5 are not yet run on a board.
@@ -151,7 +151,7 @@ refuses the reset unless an update window is open or a patch is staged.
 
 ## Measured
 
-2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, LTO on, tinylock 67dfce9 with
+2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, LTO on, tinylock 3cb22c2 with
 its stock stacks, tinytalk 9604083:
 
 | Image | Flash | RAM |
@@ -161,7 +161,7 @@ its stock stacks, tinytalk 9604083:
 | Added by tinyfota and mcumgr | 9,108 B | 3,968 B |
 | MCUboot with `mcuboot.conf` | 25,512 B of 40,960 B | 14,464 B |
 
-Re-measured 2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, on tinylock b33f550
+Re-measured 2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, on tinylock fb0f30f
 with tinytalk 4e14cfc and MCUboot's development key, with the command above
 and this directory at tinyfota's commit that added `tinyfota-tinyble.conf`:
 
@@ -174,7 +174,7 @@ In the tinyble build the transport's buffers are 588 B of RAM (`s_smp`: the
 384 B request, the 192 B reply and their counters) and its two work items
 48 B each. Both builds print no "was assigned" Kconfig warning.
 
-Re-measured 2026-10-17 on a snapshot of tinylock 46a7115 with the layout and
+Re-measured 2026-10-17 on a snapshot of tinylock d44d094 with the layout and
 command above: application 307,652 B / 101,216 B, MCUboot 25,512 B /
 14,464 B, 0 "was assigned" warnings. MCUboot's generated `.config` is
 identical to the one built by merging this file on top of MCUboot's
