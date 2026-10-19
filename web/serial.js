@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * serial.js -- SMP over WebSerial, which is mcumgr's serial framing.

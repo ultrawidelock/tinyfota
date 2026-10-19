@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /* dfu_crc.c - see dfu_crc.h. Bitwise, no table: this runs over a few hundred
  * KB once per update, not on a hot path, and the 1 KB table would live in the

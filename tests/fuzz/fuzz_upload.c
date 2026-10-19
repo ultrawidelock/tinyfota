@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /**
  * @file fuzz_upload.c - the receiver's SMP upload path (tinyfota_rx_upload),

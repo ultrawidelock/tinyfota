@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * flash_zephyr.c - the Zephyr backend of the flash seams in tinyfota_port.h: flash_map areas named

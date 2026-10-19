@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * crypto_psa.c - the signature seam in tinyfota_port.h, on Arm PSA Crypto.

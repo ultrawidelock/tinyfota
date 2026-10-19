@@ -182,4 +182,4 @@ If `cc` or `nm` is not a working tool: `make test CC=/usr/bin/clang NM="xcrun nm
 
 ## License
 
-ISC (`LICENSE`). Third-party code: `THIRD_PARTY.md`.
+Apache-2.0 (`LICENSE`). Third-party code: `THIRD_PARTY.md`.

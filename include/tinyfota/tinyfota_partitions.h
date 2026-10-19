@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * tinyfota_partitions.h - the two Zephyr partitions tinyfota uses, by

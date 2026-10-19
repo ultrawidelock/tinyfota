@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * dfu_crc.h - CRC-32 (IEEE 802.3, reflected) for the delta-update halves.

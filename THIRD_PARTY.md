@@ -1,6 +1,6 @@
 # Third-party code
 
-tinyfota's own code is ISC (see `LICENSE`). The code below keeps its own
+tinyfota's own code is Apache-2.0 (see `LICENSE`). The code below keeps its own
 license. Each license was read from its file, not assumed.
 
 | Component | Where | License | License file |

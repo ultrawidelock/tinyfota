@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /* fuzz_port.c - the seams the host port leaves to a suite, for the fuzzers. */
 #include <string.h>

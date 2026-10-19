@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ISC */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * fuzz_port.h - what the libFuzzer targets share. The flash and the clock are
