@@ -57,5 +57,7 @@ make fuzz
 - One update fits in 24 KB. MCUboot on Zephyr only.
 - Upstream Zephyr cannot write-lock MCUboot's flash.
 
-Apache-2.0. Experimental, no warranty. Not affiliated with Nordic
-Semiconductor, the Zephyr Project or MCUboot.
+Apache-2.0. Experimental, no warranty.
+
+Unofficial. Not affiliated with, endorsed or certified by any company or
+standards body named here. Trademarks belong to their owners.
