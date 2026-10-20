@@ -16,8 +16,8 @@ The app stages a signed delta. On reboot a hook in unmodified MCUboot
 rewrites the app in place, journaled, so a power cut resumes instead of
 bricking.
 
-4,804 B flash, 1,064 B RAM in the app and 3,774 B flash, 1,072 B RAM in
-MCUboot, LTO release build. A one-setting change ships as 3,611 B.
+4.7 KB flash, 1.0 KB RAM in the app and 3.7 KB flash, 1.0 KB RAM in
+MCUboot, LTO release build. A one-setting change ships as 3.5 KB.
 
 ## Quick start
 
