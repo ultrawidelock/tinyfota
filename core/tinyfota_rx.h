@@ -201,7 +201,7 @@ int tinyfota_ble_start(void);
  *
  * The same bytes and the same checks as @ref tinyfota_rx_frame, reached from
  * CBOR instead of opcodes, so that a stock mcumgr client (nRF Device Manager,
- * `mcumgr image upload`) can push an update. See src/dfu_smp_img.c.
+ * `mcumgr image upload`) can push an update. See ports/zephyr/dfu_smp_img.c.
  *
  * @param off    offset the host believes this chunk starts at
  * @param total  whole wire length; only read when @p off is 0

@@ -322,7 +322,7 @@ export class Smp {
   /**
    * Read the image list.
    *
-   * NOT window-gated on the firmware side (ports/zephyr/dfu/dfu_smp_img.c),
+   * NOT window-gated on the firmware side (ports/zephyr/dfu_smp_img.c),
    * which is what lets this page identify a board -- and so choose the right
    * delta -- before asking anyone to press a button.
    *

@@ -7,7 +7,7 @@
  *
  * Never applies anything. The patch is written into `patch_staging` and the
  * board is restarted; MCUboot does the work, because the application executes
- * from the slot the patch rewrites (see src/dfu_applier.c).
+ * from the slot the patch rewrites (see core/dfu_applier.c).
  *
  * WHAT ARRIVES, in order, as one byte stream over whatever transport:
  *
@@ -458,7 +458,7 @@ static size_t reply_err(uint8_t *rsp, enum tinyfota_err code)
 
 /* The three cores below carry the whole state machine, and they are shared:
  * the framed protocol wraps them in opcodes, and the SMP image group
- * (src/dfu_smp_img.c) drives the same three from CBOR. Neither transport holds
+ * (ports/zephyr/dfu_smp_img.c) drives the same three from CBOR. Neither transport holds
  * any transfer state of its own, so there is one place where a patch can be
  * accepted and one set of checks in front of it. TINYFOTA_ERR_OK (0) means
  * accepted; every other value is refused. */
@@ -810,7 +810,7 @@ int tinyfota_rx_frame(enum tinyfota_owner owner, const uint8_t *frame, size_t le
 #ifdef CONFIG_TINYFOTA_SMP_IMG
 
 /* MCUboot's image magic and the two header fields needed to measure a wrapper.
- * Also spelled out in src/dfu_smp_img.c, which walks the running image's TLVs;
+ * Also spelled out in ports/zephyr/dfu_smp_img.c, which walks the running image's TLVs;
  * this is MCUboot's fixed on-disk format and cannot drift. */
 #define MCUBOOT_IMAGE_MAGIC 0x96f3b83du
 #define MCUBOOT_HDR_MIN     16u

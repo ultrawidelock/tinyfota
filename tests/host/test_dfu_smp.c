@@ -4,7 +4,7 @@
 /**
  * @file test_dfu_smp.c — the SMP image-management group on host.
  *
- * File under test: ports/zephyr/dfu/dfu_smp_img.c
+ * File under test: ports/zephyr/dfu_smp_img.c
  *
  * This is the second front door onto the same receiver: a stock mcumgr client
  * (nRF Device Manager, `mcumgr image upload`) pushes CBOR at group 1 and every

@@ -200,9 +200,7 @@ export class Framer {
      *
      * So it is kept for what it guarantees rather than for what it fixes: that
      * a line which cannot be a frame is discarded outright, instead of being
-     * carried forward in pieces to be reinterpreted later. The fuzz is in
-     * tests/tooling/serial_frame_check.mjs and asserts the property that
-     * actually matters -- no packet is ever emitted that was not sent. */
+     * carried forward in pieces to be reinterpreted later. */
     this.overrun = false;
     /* Previous byte, so the 0x06 0x09 resync pair can be spotted across a read
      * boundary as well as inside one. */
