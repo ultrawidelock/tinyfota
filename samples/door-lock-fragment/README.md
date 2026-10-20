@@ -133,7 +133,7 @@ and 5 need the application side above: the window gesture and the SMP
 advertisement.
 
 Steps 1 to 3 measured host-side 2026-10-17, on a snapshot of tinylock f074054
-with tinytalk 9604083 and MCUboot's development key: both images 307,652 B
+with tinytalk ad86dea and MCUboot's development key: both images 307,652 B
 flash / 101,216 B RAM, `record  abi 1, patch 5,775 B, file 5,871 B`, 23.5% of
 the 24,576 B patch capacity. Steps 4 and 5 are not yet run on a board.
 
@@ -152,7 +152,7 @@ refuses the reset unless an update window is open or a patch is staged.
 ## Measured
 
 2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, LTO on, tinylock 3cb22c2 with
-its stock stacks, tinytalk 9604083:
+its stock stacks, tinytalk ad86dea:
 
 | Image | Flash | RAM |
 |---|---|---|
@@ -162,7 +162,7 @@ its stock stacks, tinytalk 9604083:
 | MCUboot with `mcuboot.conf` | 25,512 B of 40,960 B | 14,464 B |
 
 Re-measured 2026-10-17, NCS v3.3.0, `decawave_dwm3001cdk`, on tinylock fb0f30f
-with tinytalk 4e14cfc and MCUboot's development key, with the command above
+with tinytalk 9a6f2f0 and MCUboot's development key, with the command above
 and this directory at tinyfota's commit that added `tinyfota-tinyble.conf`:
 
 | Build | Application | MCUboot |
