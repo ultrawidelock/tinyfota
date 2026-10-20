@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zephyr/mgmt/mcumgr/mgmt/callbacks.h> — the event hook a handler
  * uses to veto a command. tinyfota registers one on os_mgmt reset. */
 #ifndef SMPFAKE_ZEPHYR_MGMT_MCUMGR_CALLBACKS_H

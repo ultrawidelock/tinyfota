@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 # tinyfota: delta firmware update for chips that cannot hold two images. These
 # are the halves that live in flash.
 #

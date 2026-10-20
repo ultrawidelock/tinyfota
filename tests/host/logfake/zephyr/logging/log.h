@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* logfake: minimal <zephyr/logging/log.h>. */
 #ifndef LOGFAKE_ZEPHYR_LOGGING_LOG_H
 #define LOGFAKE_ZEPHYR_LOGGING_LOG_H

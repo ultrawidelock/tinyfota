@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* psafake implementations — recording doubles only (see psafake.h: the fake
  * does NO crypto). Every status/olen is a knob. Trimmed to the signature seam's
  * calls. */

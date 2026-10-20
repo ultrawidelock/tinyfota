@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Write the seed corpora for the libFuzzer targets in tests/fuzz/.
 
     python3 tests/fuzz/gen_seeds.py tests/fuzz/corpus

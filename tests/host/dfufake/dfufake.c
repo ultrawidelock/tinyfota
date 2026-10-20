@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* dfufake — the scripted detools double and the running-image buffer. The
  * flash and reboot halves this file used to carry are the flash host
  * backend now (tests/host/port/flash_host.c); see dfufake.h.

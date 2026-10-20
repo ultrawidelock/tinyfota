@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: <tinyble/tb_dfu.h>, the two value handles and the three hooks
  * dfu_tinyble.c provides, as the contract with tinyble states them. */
 #ifndef TBFAKE_TB_DFU_H

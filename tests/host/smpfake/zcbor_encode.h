@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zcbor_encode.h>. Every put appends one typed item to the recorded
  * output and returns true, unless the encode_fail_in knob says otherwise --
  * which is how the EMSGSIZE branches are reached. */

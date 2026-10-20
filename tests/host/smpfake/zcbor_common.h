@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zcbor_common.h> — the state handle and byte-string type.
  * See ../smpfake.h: this records puts, it does not produce CBOR. */
 #ifndef SMPFAKE_ZCBOR_COMMON_H

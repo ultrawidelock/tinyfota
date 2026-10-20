@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* logfake: minimal <zephyr/kernel.h> for host-building the SMP image group
  * (ports/zephyr/dfu_smp_img.c). Trimmed to what that file reaches. */
 #ifndef LOGFAKE_ZEPHYR_KERNEL_H

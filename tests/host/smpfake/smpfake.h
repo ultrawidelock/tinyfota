@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake — test-side control/inspection API for the fake zcbor and mcumgr
  * surfaces that ports/zephyr/dfu/dfu_smp_img.c builds against.
  *

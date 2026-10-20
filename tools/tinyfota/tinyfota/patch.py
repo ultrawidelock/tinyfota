@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Build a signed delta patch for a single-slot MCUboot board.
 
 Takes two SIGNED MCUboot images and emits one `.wdfu` file: a header the

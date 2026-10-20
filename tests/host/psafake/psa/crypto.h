@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* psafake: minimal <psa/crypto.h> recording double (see ../psafake.h — the
  * fake does NO crypto; statuses are knobs, outputs are deterministic filler).
  * Macro values are arbitrary-but-distinct; the suites assert the code under

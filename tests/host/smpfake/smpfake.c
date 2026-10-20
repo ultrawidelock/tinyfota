@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake — recording zcbor encoder, table-driven zcbor decoder, and an
  * mcumgr registry that records. See smpfake.h for what this is worth. */
 

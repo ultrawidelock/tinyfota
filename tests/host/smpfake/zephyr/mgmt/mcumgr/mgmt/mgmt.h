@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zephyr/mgmt/mcumgr/mgmt/mgmt.h> — the handler/group registry and
  * the error codes a handler returns. mgmt_register_group() records rather than
  * links, so a suite reaches the handlers exactly the way mcumgr would: through

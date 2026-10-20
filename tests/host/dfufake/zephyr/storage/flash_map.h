@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* dfufake: <zephyr/storage/flash_map.h>, only the macro the host suites reach
  * through tinyfota/tinyfota_partitions.h.
  *

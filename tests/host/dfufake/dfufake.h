@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* dfufake — test-side control/inspection API for the DFU suites.
  *
  * The flash is the real host backend of the flash seams (tests/host/port/

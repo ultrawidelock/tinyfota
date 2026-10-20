@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* dfufake: <detools.h> as a SCRIPTED DOUBLE, not the vendored patcher.
  *
  * dfu_applier.c's entire contract with detools is five callbacks, and every

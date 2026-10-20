@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: suite controls for the tinyble and delayable-work doubles that
  * ports/zephyr/dfu_tinyble.c builds against (tests/host/test_tinyble.c).
  *

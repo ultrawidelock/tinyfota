@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Prove `tinyfota release` never fails silently.
 
     python tests/tooling/release_check.py      # with tinyfota installed

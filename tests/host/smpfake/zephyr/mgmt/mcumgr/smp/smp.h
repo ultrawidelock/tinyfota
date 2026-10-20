@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zephyr/mgmt/mcumgr/smp/smp.h> — the streamer a handler is handed.
  * Only the two zcbor states are reachable from it, which is all
  * dfu_smp_img.c ever touches. */

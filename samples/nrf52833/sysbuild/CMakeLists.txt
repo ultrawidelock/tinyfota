@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 # Sysbuild entry point for the tinyfota sample: Zephyr's template
 # (zephyr/share/sysbuild/template/CMakeLists.txt) plus the one setting that must
 # be made at the sysbuild level.

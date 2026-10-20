@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /*
  * flash_host.c - the host backend of the flash seams in tinyfota_port.h: RAM partitions that enforce
  * the nRF alignment rules (word writes, page erases). The strictness is the

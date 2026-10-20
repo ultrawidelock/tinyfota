@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* smpfake: <zephyr/mgmt/mcumgr/mgmt/handlers.h>.
  *
  * On target MCUMGR_HANDLER_DEFINE() puts the init function in an iterable

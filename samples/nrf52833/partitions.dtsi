@@ -1,3 +1,4 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /* The flash map on upstream Zephyr: the same addresses as pm_static.yml, which

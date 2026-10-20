@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 # The settings only NCS has. Upstream Zephyr refuses a .conf that assigns a
 # symbol it does not define, so these cannot sit in prj.conf or
 # sysbuild/mcuboot.conf. Sysbuild includes this file with the workspace's

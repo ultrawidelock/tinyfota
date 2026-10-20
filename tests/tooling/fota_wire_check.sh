@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # fota_wire_check.sh — the browser's copy of the update protocols still agrees
 #                      with the Python the board was proved against.

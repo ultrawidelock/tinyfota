@@ -1,3 +1,4 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /* fuzz_port.c - the seams the host port leaves to a suite, for the fuzzers. */

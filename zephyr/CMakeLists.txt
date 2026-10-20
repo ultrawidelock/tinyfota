@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 # Delta update, bootloader half. Contributes nothing unless
 # CONFIG_TINYFOTA_APPLIER=y, so every image that does not ask for it -- which is
 # every image except MCUboot -- stays byte-identical.

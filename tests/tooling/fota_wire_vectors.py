@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Emit the wire vectors fota_wire_check.mjs compares the browser code against.
 
     fota_wire_vectors.py <out.json> <repo-root>

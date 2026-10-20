@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /*
  * osal_host.c - the host backend of the receiver's time, lock and
  * deferred-work seams in tinyfota_port.h, which IS the test double.

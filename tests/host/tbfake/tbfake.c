@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: recording tb_notify(), a counted tb_zephyr_lock(), and delayable work
  * on a virtual clock. See tbfake.h. */
 

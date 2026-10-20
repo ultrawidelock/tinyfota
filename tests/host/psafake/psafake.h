@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* psafake — test-side control/inspection API for the fake PSA Crypto surface
  * under tests/host/psafake/psa/.
  *

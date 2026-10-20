@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Prove the sample's two flash maps agree, and the door-lock fragment's with them.
 
     python tests/tooling/partition_map_check.py      # with tinyfota installed

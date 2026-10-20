@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Emit the public half of the MCUboot signing key as a C array.
 
 The application verifies a staged patch's header against this before writing it

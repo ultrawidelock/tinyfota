@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: <tinyble/tb_zephyr.h>, the lock a work item holds around tb_* calls.
  * The fake counts it, so a suite can check every tb_notify() ran under it. */
 #ifndef TBFAKE_TB_ZEPHYR_H

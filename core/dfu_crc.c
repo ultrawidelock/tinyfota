@@ -1,3 +1,4 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /* dfu_crc.c - see dfu_crc.h. Bitwise, no table: this runs over a few hundred

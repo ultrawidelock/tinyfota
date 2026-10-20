@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* dfufake: <zephyr/sys/util.h>, the handful of macros tinyfota uses. Every one
  * is guarded: logfake's <zephyr/kernel.h> defines some of the same names and
  * either header may be included first. */

@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: the part of tinyble's <tinyble/tinyble.h> that ports/zephyr/dfu_tinyble.c
  * reaches. A test double written from the interface tinyfota was handed, not a
  * copy of tinyble's header: the error values, tb_notify() and tb_mtu(). */

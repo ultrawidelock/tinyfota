@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aseem Chopra */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* tbfake: logfake's <zephyr/kernel.h> plus the delayable work dfu_tinyble.c
  * schedules. The suite runs it on a virtual clock of its own
  * (tbfake_advance_ms()), single-threaded, as the system work queue would:

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """The `tinyfota` command: build, info, stage, recovery, wrap, push, release."""
 
 import argparse

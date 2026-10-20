@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Write the index the browser update page looks a board up in.
 
     tinyfota release ...          writes it as the last step of a release

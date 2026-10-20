@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Push a delta patch to the board over SMP, the way a phone would.
 
 This speaks mcumgr over GATT -- byte for byte what nRF Device Manager sends --

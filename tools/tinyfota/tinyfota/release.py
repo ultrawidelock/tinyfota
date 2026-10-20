@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Aseem Chopra
+# SPDX-License-Identifier: Apache-2.0
+
 """Build a release: one delta from every base still in the field, the whole
 image for serial recovery, and the index the browser page reads.
 
