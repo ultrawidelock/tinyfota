@@ -168,7 +168,7 @@ and this directory at tinyfota's commit that added `tinyfota-tinyble.conf`:
 | Build | Application | MCUboot |
 |---|---|---|
 | Zephyr host, `tinyfota.conf` | 314,176 B flash / 101,408 B RAM | 25,512 B / 14,464 B |
-| tinyble 8ecda5d, tinygrid b8e3b4a, tinypsa d556143, `tinyfota-tinyble.conf` | 215,824 B flash / 70,680 B RAM | 25,512 B / 14,464 B |
+| tinyble 080e252, tinygrid b8e3b4a, tinypsa d556143, `tinyfota-tinyble.conf` | 215,824 B flash / 70,680 B RAM | 25,512 B / 14,464 B |
 
 In the tinyble build the transport's buffers are 588 B of RAM (`s_smp`: the
 384 B request, the 192 B reply and their counters) and its two work items
